@@ -872,8 +872,10 @@ int AudioEngine::ProcessAudio(const void* input, void* output, unsigned long fra
         LOG_DEBUG("Priming output buffers");
     }
 
-    // Convert input to internal format if necessary
+    // Convert input to internal format and write to ring buffer
     const float* inputFloat = nullptr;
+    bool inputReady = false;
+
     if (input) {
         if (m_inputFormat == AudioFormat::Float32) {
             inputFloat = static_cast<const float*>(input);
@@ -887,9 +889,17 @@ int AudioEngine::ProcessAudio(const void* input, void* output, unsigned long fra
         float inputPeak = simd::calculatePeakLevel(inputFloat, frames * m_inputChannels);
         float currentInputPeak = m_peakInputLevel.load();
         m_peakInputLevel = std::max(inputPeak, currentInputPeak * PEAK_DECAY_RATE);
+
+        // Write input to ring buffer for thread-safe processing
+        size_t samplesWritten = m_inputBuffer->write(inputFloat, frames * m_inputChannels);
+        if (samplesWritten < frames * m_inputChannels) {
+            m_bufferOverruns++;
+            LOG_DEBUG("Input ring buffer overflow: wrote {} of {} samples", samplesWritten, frames * m_inputChannels);
+        }
+        inputReady = true;
     }
 
-    // Process through HRTF
+    // Determine output destination
     float* outputFloat = nullptr;
     if (m_outputFormat == AudioFormat::Float32) {
         outputFloat = static_cast<float*>(output);
@@ -897,32 +907,89 @@ int AudioEngine::ProcessAudio(const void* input, void* output, unsigned long fra
         outputFloat = m_conversionBufferOutput.data();
     }
 
-    if (m_hrtf && inputFloat && outputFloat) {
-        // Check for sample rate mismatch and handle conversion
-        if (m_sampleRate != m_targetSampleRate) {
-            if (ApplySampleRateConversion(inputFloat, m_resampleBuffer.data(), frames, frames)) {
-                m_hrtf->Process(m_resampleBuffer.data(), outputFloat, frames, m_inputChannels);
-            } else {
-                // Fallback to direct processing if SRC fails
-                m_hrtf->Process(inputFloat, outputFloat, frames, m_inputChannels);
-            }
-        } else {
-            m_hrtf->Process(inputFloat, outputFloat, frames, m_inputChannels);
-        }
+    // Try to read processed audio from output ring buffer first
+    size_t outputSamplesAvailable = m_outputBuffer->available();
+    size_t outputSamplesNeeded = frames * m_outputChannels;
 
-        m_framesProcessed += frames;
+    if (outputSamplesAvailable >= outputSamplesNeeded) {
+        // We have enough processed audio available
+        size_t samplesRead = m_outputBuffer->read(outputFloat, outputSamplesNeeded);
+        if (samplesRead == outputSamplesNeeded) {
+            // Successfully got processed audio from buffer
+            m_framesProcessed += frames;
+        } else {
+            // Partial read - fill remainder with silence
+            std::memset(outputFloat + samplesRead, 0,
+                       (outputSamplesNeeded - samplesRead) * sizeof(float));
+            m_bufferUnderruns++;
+        }
     } else {
-        // Pass-through or silence
-        if (inputFloat && m_inputChannels == m_outputChannels) {
-            std::memcpy(outputFloat, inputFloat, frames * m_outputChannels * sizeof(float));
-        } else if (inputFloat && m_inputChannels == 1 && m_outputChannels == 2) {
-            // Mono to stereo conversion
-            for (size_t i = 0; i < frames; ++i) {
-                outputFloat[i * 2] = inputFloat[i];
-                outputFloat[i * 2 + 1] = inputFloat[i];
+        // Not enough processed audio available - process directly if possible
+        size_t inputSamplesAvailable = m_inputBuffer->available();
+        size_t inputSamplesNeeded = frames * m_inputChannels;
+
+        if (m_hrtf && inputReady && inputSamplesAvailable >= inputSamplesNeeded) {
+            // Read input from ring buffer
+            size_t samplesRead = m_inputBuffer->read(m_resampleBuffer.data(), inputSamplesNeeded);
+
+            if (samplesRead == inputSamplesNeeded) {
+                // Process through HRTF
+                if (m_sampleRate != m_targetSampleRate) {
+                    // Apply sample rate conversion if needed
+                    if (ApplySampleRateConversion(m_resampleBuffer.data(),
+                                                m_conversionBufferInput.data(), frames, frames)) {
+                        m_hrtf->Process(m_conversionBufferInput.data(), outputFloat, frames, m_inputChannels);
+                    } else {
+                        // Fallback to direct processing if SRC fails
+                        m_hrtf->Process(m_resampleBuffer.data(), outputFloat, frames, m_inputChannels);
+                    }
+                } else {
+                    m_hrtf->Process(m_resampleBuffer.data(), outputFloat, frames, m_inputChannels);
+                }
+
+                // Store processed audio in output ring buffer for future use
+                size_t outputWritten = m_outputBuffer->write(outputFloat, outputSamplesNeeded);
+                if (outputWritten < outputSamplesNeeded) {
+                    LOG_DEBUG("Output ring buffer full: wrote {} of {} samples", outputWritten, outputSamplesNeeded);
+                }
+
+                m_framesProcessed += frames;
+            } else {
+                // Insufficient input samples - output silence
+                std::memset(outputFloat, 0, outputSamplesNeeded * sizeof(float));
+                m_bufferUnderruns++;
             }
         } else {
-            std::memset(outputFloat, 0, frames * m_outputChannels * sizeof(float));
+            // No HRTF processor or insufficient input - handle pass-through or silence
+            if (inputFloat && inputReady) {
+                if (m_inputChannels == m_outputChannels) {
+                    std::memcpy(outputFloat, inputFloat, frames * m_outputChannels * sizeof(float));
+                } else if (m_inputChannels == 1 && m_outputChannels == 2) {
+                    // Mono to stereo conversion with SIMD optimization
+                    const size_t simdFrames = frames & ~7;  // Process 8 frames at a time
+
+#ifdef VRB_USE_AVX2
+                    for (size_t i = 0; i < simdFrames; i += 8) {
+                        __m256 mono = _mm256_loadu_ps(&inputFloat[i]);
+                        __m256 stereo_lo = _mm256_unpacklo_ps(mono, mono);
+                        __m256 stereo_hi = _mm256_unpackhi_ps(mono, mono);
+                        _mm256_storeu_ps(&outputFloat[i * 2], stereo_lo);
+                        _mm256_storeu_ps(&outputFloat[i * 2 + 8], stereo_hi);
+                    }
+#endif
+                    // Handle remaining frames
+                    for (size_t i = simdFrames; i < frames; ++i) {
+                        outputFloat[i * 2] = inputFloat[i];
+                        outputFloat[i * 2 + 1] = inputFloat[i];
+                    }
+                } else {
+                    // Channel count mismatch - output silence
+                    std::memset(outputFloat, 0, outputSamplesNeeded * sizeof(float));
+                }
+            } else {
+                // No input available - output silence
+                std::memset(outputFloat, 0, outputSamplesNeeded * sizeof(float));
+            }
         }
     }
 
@@ -1068,89 +1135,348 @@ void AudioEngine::SetAdaptiveBuffering(bool enable) {
 
 void AudioEngine::ConvertAudioFormat(const void* input, float* output, size_t frames,
                                    AudioFormat inputFormat, int inputChannels) {
+    if (!input || !output || frames == 0 || inputChannels <= 0) {
+        LOG_ERROR("Invalid parameters for audio format conversion");
+        return;
+    }
+
     const size_t samples = frames * inputChannels;
 
-    switch (inputFormat) {
-        case AudioFormat::Float32:
-            std::memcpy(output, input, samples * sizeof(float));
-            break;
-        case AudioFormat::Int16:
-            simd::convertInt16ToFloat(static_cast<const int16_t*>(input), output, samples);
-            break;
-        case AudioFormat::Int32: {
-            const int32_t* input32 = static_cast<const int32_t*>(input);
-            for (size_t i = 0; i < samples; ++i) {
-                output[i] = static_cast<float>(input32[i]) / 2147483648.0f;
+    // Validate buffer bounds
+    if (samples > m_conversionBufferInput.size() / sizeof(float)) {
+        LOG_WARN("Conversion buffer too small, reallocating: {} -> {} samples",
+                 m_conversionBufferInput.size() / sizeof(float), samples);
+        m_conversionBufferInput.resize(samples * sizeof(float));
+    }
+
+    try {
+        switch (inputFormat) {
+            case AudioFormat::Float32: {
+                const float* inputFloat = static_cast<const float*>(input);
+                // Validate float values and handle NaN/Inf
+                for (size_t i = 0; i < samples; ++i) {
+                    float value = inputFloat[i];
+                    if (std::isnan(value) || std::isinf(value)) {
+                        output[i] = 0.0f;  // Replace invalid values with silence
+                        if (i == 0) LOG_WARN("Invalid float values detected in input");
+                    } else {
+                        output[i] = std::clamp(value, -1.0f, 1.0f);  // Clamp to valid range
+                    }
+                }
+                break;
             }
-            break;
-        }
-        case AudioFormat::Int24: {
-            const uint8_t* input24 = static_cast<const uint8_t*>(input);
-            for (size_t i = 0; i < samples; ++i) {
-                int32_t sample = (input24[i*3] << 8) | (input24[i*3+1] << 16) | (input24[i*3+2] << 24);
-                output[i] = static_cast<float>(sample) / 2147483648.0f;
+            case AudioFormat::Int16:
+                simd::convertInt16ToFloat(static_cast<const int16_t*>(input), output, samples);
+                break;
+            case AudioFormat::Int32: {
+                const int32_t* input32 = static_cast<const int32_t*>(input);
+                // Use SIMD-optimized conversion where possible
+                const size_t simdSamples = samples & ~7;  // Process 8 samples at a time
+
+#ifdef VRB_USE_AVX2
+                const __m256 scale = _mm256_set1_ps(1.0f / 2147483648.0f);
+                for (size_t i = 0; i < simdSamples; i += 8) {
+                    __m256i int32_data = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(&input32[i]));
+                    __m256 float_data = _mm256_cvtepi32_ps(int32_data);
+                    __m256 scaled_data = _mm256_mul_ps(float_data, scale);
+                    _mm256_storeu_ps(&output[i], scaled_data);
+                }
+#else
+                // Fallback scalar conversion
+                for (size_t i = 0; i < simdSamples; ++i) {
+                    output[i] = static_cast<float>(input32[i]) / 2147483648.0f;
+                }
+#endif
+                // Handle remaining samples
+                for (size_t i = simdSamples; i < samples; ++i) {
+                    output[i] = static_cast<float>(input32[i]) / 2147483648.0f;
+                }
+                break;
             }
-            break;
+            case AudioFormat::Int24: {
+                const uint8_t* input24 = static_cast<const uint8_t*>(input);
+                for (size_t i = 0; i < samples; ++i) {
+                    // Properly handle 24-bit signed integer conversion
+                    int32_t sample = (static_cast<int32_t>(input24[i*3]) << 8) |
+                                   (static_cast<int32_t>(input24[i*3+1]) << 16) |
+                                   (static_cast<int32_t>(input24[i*3+2]) << 24);
+
+                    // Sign extend from 24-bit to 32-bit
+                    if (sample & 0x80000000) {
+                        sample |= 0xFF000000;
+                    }
+
+                    output[i] = static_cast<float>(sample) / 2147483648.0f;
+                }
+                break;
+            }
+            default:
+                LOG_ERROR("Unsupported input audio format: {}", static_cast<int>(inputFormat));
+                std::fill(output, output + samples, 0.0f);
+                break;
         }
+    } catch (const std::exception& e) {
+        LOG_ERROR("Audio format conversion error: {}", e.what());
+        std::fill(output, output + samples, 0.0f);
     }
 }
 
 void AudioEngine::ConvertAudioFormat(const float* input, void* output, size_t frames,
                                    AudioFormat outputFormat, int outputChannels) {
+    if (!input || !output || frames == 0 || outputChannels <= 0) {
+        LOG_ERROR("Invalid parameters for audio format conversion");
+        return;
+    }
+
     const size_t samples = frames * outputChannels;
 
-    switch (outputFormat) {
-        case AudioFormat::Float32:
-            std::memcpy(output, input, samples * sizeof(float));
-            break;
-        case AudioFormat::Int16:
-            simd::convertFloatToInt16(input, static_cast<int16_t*>(output), samples);
-            break;
-        case AudioFormat::Int32: {
-            int32_t* output32 = static_cast<int32_t*>(output);
-            for (size_t i = 0; i < samples; ++i) {
-                float scaled = input[i] * 2147483647.0f;
-                output32[i] = static_cast<int32_t>(std::clamp(scaled, -2147483648.0f, 2147483647.0f));
+    // Validate buffer bounds
+    if (samples > m_conversionBufferOutput.size() / audio_utils::GetSampleSize(outputFormat)) {
+        LOG_WARN("Output conversion buffer too small, reallocating");
+        m_conversionBufferOutput.resize(samples * audio_utils::GetSampleSize(outputFormat));
+    }
+
+    try {
+        switch (outputFormat) {
+            case AudioFormat::Float32: {
+                float* outputFloat = static_cast<float*>(output);
+                // Validate and clamp input values
+                for (size_t i = 0; i < samples; ++i) {
+                    float value = input[i];
+                    if (std::isnan(value) || std::isinf(value)) {
+                        outputFloat[i] = 0.0f;
+                        if (i == 0) LOG_WARN("Invalid float values detected in output conversion");
+                    } else {
+                        outputFloat[i] = std::clamp(value, -1.0f, 1.0f);
+                    }
+                }
+                break;
             }
-            break;
-        }
-        case AudioFormat::Int24: {
-            uint8_t* output24 = static_cast<uint8_t*>(output);
-            for (size_t i = 0; i < samples; ++i) {
-                float scaled = input[i] * 8388607.0f;
-                int32_t sample = static_cast<int32_t>(std::clamp(scaled, -8388608.0f, 8388607.0f));
-                output24[i*3] = (sample >> 8) & 0xFF;
-                output24[i*3+1] = (sample >> 16) & 0xFF;
-                output24[i*3+2] = (sample >> 24) & 0xFF;
+            case AudioFormat::Int16:
+                simd::convertFloatToInt16(input, static_cast<int16_t*>(output), samples);
+                break;
+            case AudioFormat::Int32: {
+                int32_t* output32 = static_cast<int32_t*>(output);
+                const size_t simdSamples = samples & ~7;
+
+#ifdef VRB_USE_AVX2
+                const __m256 scale = _mm256_set1_ps(2147483647.0f);
+                const __m256 min_val = _mm256_set1_ps(-2147483648.0f);
+                const __m256 max_val = _mm256_set1_ps(2147483647.0f);
+
+                for (size_t i = 0; i < simdSamples; i += 8) {
+                    __m256 float_data = _mm256_loadu_ps(&input[i]);
+
+                    // Scale and clamp
+                    float_data = _mm256_mul_ps(float_data, scale);
+                    float_data = _mm256_max_ps(_mm256_min_ps(float_data, max_val), min_val);
+
+                    // Convert to int32
+                    __m256i int32_data = _mm256_cvtps_epi32(float_data);
+                    _mm256_storeu_si256(reinterpret_cast<__m256i*>(&output32[i]), int32_data);
+                }
+#else
+                for (size_t i = 0; i < simdSamples; ++i) {
+                    float scaled = input[i] * 2147483647.0f;
+                    output32[i] = static_cast<int32_t>(std::clamp(scaled, -2147483648.0f, 2147483647.0f));
+                }
+#endif
+                // Handle remaining samples
+                for (size_t i = simdSamples; i < samples; ++i) {
+                    float scaled = input[i] * 2147483647.0f;
+                    output32[i] = static_cast<int32_t>(std::clamp(scaled, -2147483648.0f, 2147483647.0f));
+                }
+                break;
             }
-            break;
+            case AudioFormat::Int24: {
+                uint8_t* output24 = static_cast<uint8_t*>(output);
+                for (size_t i = 0; i < samples; ++i) {
+                    // Clamp input to valid range first
+                    float clampedInput = std::clamp(input[i], -1.0f, 1.0f);
+                    float scaled = clampedInput * 8388607.0f;  // 2^23 - 1
+                    int32_t sample = static_cast<int32_t>(std::clamp(scaled, -8388608.0f, 8388607.0f));
+
+                    // Pack 24-bit value (little-endian)
+                    output24[i*3] = sample & 0xFF;
+                    output24[i*3+1] = (sample >> 8) & 0xFF;
+                    output24[i*3+2] = (sample >> 16) & 0xFF;
+                }
+                break;
+            }
+            default:
+                LOG_ERROR("Unsupported output audio format: {}", static_cast<int>(outputFormat));
+                std::memset(output, 0, samples * audio_utils::GetSampleSize(outputFormat));
+                break;
         }
+    } catch (const std::exception& e) {
+        LOG_ERROR("Audio format conversion error: {}", e.what());
+        std::memset(output, 0, samples * audio_utils::GetSampleSize(outputFormat));
     }
 }
 
 bool AudioEngine::ApplySampleRateConversion(const float* input, float* output,
                                           size_t inputFrames, size_t outputFrames) {
+    if (!input || !output || inputFrames == 0 || outputFrames == 0) {
+        LOG_ERROR("Invalid parameters for sample rate conversion");
+        return false;
+    }
+
     if (!m_srcState->initialized) {
         m_srcState->ratio = static_cast<double>(m_targetSampleRate) / m_sampleRate;
         m_srcState->initialized = true;
+
+        // Initialize history buffer for better interpolation
+        m_srcState->history.resize(256 * m_inputChannels, 0.0f);
+        m_srcState->historyIndex = 0;
+
+        LOG_INFO("Sample rate conversion initialized: {}Hz -> {}Hz (ratio: {:.4f})",
+                 m_sampleRate, m_targetSampleRate, m_srcState->ratio);
     }
 
-    // Simple linear interpolation for now
-    // TODO: Implement proper SRC algorithm (e.g., libsamplerate integration)
-    double step = 1.0 / m_srcState->ratio;
+    // Check if conversion is actually needed
+    if (std::abs(m_srcState->ratio - 1.0) < 0.001) {
+        // Essentially no conversion needed - direct copy
+        if (inputFrames == outputFrames) {
+            std::memcpy(output, input, inputFrames * m_inputChannels * sizeof(float));
+            return true;
+        }
+    }
+
+    try {
+        // Use improved interpolation algorithm based on the conversion ratio
+        if (m_srcState->ratio > 1.5 || m_srcState->ratio < 0.67) {
+            // Significant rate change - use high-quality polyphase interpolation
+            return ApplyPolyphaseInterpolation(input, output, inputFrames, outputFrames);
+        } else {
+            // Moderate rate change - use optimized linear interpolation
+            return ApplyLinearInterpolation(input, output, inputFrames, outputFrames);
+        }
+    } catch (const std::exception& e) {
+        LOG_ERROR("Sample rate conversion error: {}", e.what());
+        // Fallback to simple copy/repeat strategy
+        if (m_srcState->ratio >= 1.0) {
+            // Upsampling - repeat samples
+            for (size_t i = 0; i < outputFrames; ++i) {
+                size_t srcIdx = std::min(static_cast<size_t>(i / m_srcState->ratio), inputFrames - 1);
+                for (int ch = 0; ch < m_inputChannels; ++ch) {
+                    output[i * m_inputChannels + ch] = input[srcIdx * m_inputChannels + ch];
+                }
+            }
+        } else {
+            // Downsampling - skip samples
+            for (size_t i = 0; i < outputFrames; ++i) {
+                size_t srcIdx = static_cast<size_t>(i * (1.0 / m_srcState->ratio));
+                if (srcIdx < inputFrames) {
+                    for (int ch = 0; ch < m_inputChannels; ++ch) {
+                        output[i * m_inputChannels + ch] = input[srcIdx * m_inputChannels + ch];
+                    }
+                } else {
+                    for (int ch = 0; ch < m_inputChannels; ++ch) {
+                        output[i * m_inputChannels + ch] = 0.0f;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+}
+
+bool AudioEngine::ApplyLinearInterpolation(const float* input, float* output,
+                                         size_t inputFrames, size_t outputFrames) {
+    const double step = 1.0 / m_srcState->ratio;
     double position = 0.0;
 
-    for (size_t i = 0; i < outputFrames && position < inputFrames - 1; ++i) {
-        size_t idx = static_cast<size_t>(position);
-        double frac = position - idx;
+    for (size_t i = 0; i < outputFrames; ++i) {
+        const size_t idx = static_cast<size_t>(position);
+        const double frac = position - idx;
 
-        for (int ch = 0; ch < m_inputChannels; ++ch) {
-            float sample1 = input[idx * m_inputChannels + ch];
-            float sample2 = input[(idx + 1) * m_inputChannels + ch];
-            output[i * m_inputChannels + ch] = sample1 + frac * (sample2 - sample1);
+        if (idx + 1 < inputFrames) {
+            // Normal case - interpolate between two samples
+            for (int ch = 0; ch < m_inputChannels; ++ch) {
+                const float sample1 = input[idx * m_inputChannels + ch];
+                const float sample2 = input[(idx + 1) * m_inputChannels + ch];
+                output[i * m_inputChannels + ch] = sample1 + frac * (sample2 - sample1);
+            }
+        } else if (idx < inputFrames) {
+            // At the end - use last sample
+            for (int ch = 0; ch < m_inputChannels; ++ch) {
+                output[i * m_inputChannels + ch] = input[idx * m_inputChannels + ch];
+            }
+        } else {
+            // Beyond input - output silence
+            for (int ch = 0; ch < m_inputChannels; ++ch) {
+                output[i * m_inputChannels + ch] = 0.0f;
+            }
         }
 
         position += step;
+    }
+
+    return true;
+}
+
+bool AudioEngine::ApplyPolyphaseInterpolation(const float* input, float* output,
+                                            size_t inputFrames, size_t outputFrames) {
+    // Simple polyphase implementation using a small FIR filter
+    constexpr int FILTER_LENGTH = 8;
+    constexpr float FILTER_COEFFS[FILTER_LENGTH] = {
+        -0.015625f, 0.0625f, -0.234375f, 0.734375f,
+         0.734375f, -0.234375f, 0.0625f, -0.015625f
+    };
+
+    const double step = 1.0 / m_srcState->ratio;
+    double position = 0.0;
+
+    // Combine input with history for seamless processing
+    std::vector<float> extendedInput(m_srcState->history.size() + inputFrames * m_inputChannels);
+    std::memcpy(extendedInput.data(), m_srcState->history.data(), m_srcState->history.size() * sizeof(float));
+    std::memcpy(extendedInput.data() + m_srcState->history.size(), input, inputFrames * m_inputChannels * sizeof(float));
+
+    const size_t historyFrames = m_srcState->history.size() / m_inputChannels;
+
+    for (size_t i = 0; i < outputFrames; ++i) {
+        const double actualPos = position + historyFrames;
+        const size_t centerIdx = static_cast<size_t>(actualPos);
+        const double frac = actualPos - centerIdx;
+
+        for (int ch = 0; ch < m_inputChannels; ++ch) {
+            float result = 0.0f;
+
+            // Apply polyphase filter
+            for (int j = 0; j < FILTER_LENGTH; ++j) {
+                const int sampleIdx = static_cast<int>(centerIdx) - FILTER_LENGTH/2 + j;
+                if (sampleIdx >= 0 && sampleIdx < static_cast<int>(extendedInput.size() / m_inputChannels)) {
+                    // Interpolate filter coefficient based on fractional position
+                    float coeff = FILTER_COEFFS[j];
+                    if (j > 0 && j < FILTER_LENGTH - 1) {
+                        const float prevCoeff = FILTER_COEFFS[j-1];
+                        const float nextCoeff = FILTER_COEFFS[j+1];
+                        coeff += frac * (nextCoeff - prevCoeff) * 0.5f;
+                    }
+
+                    result += extendedInput[sampleIdx * m_inputChannels + ch] * coeff;
+                }
+            }
+
+            output[i * m_inputChannels + ch] = result;
+        }
+
+        position += step;
+    }
+
+    // Update history buffer with recent input
+    const size_t historySize = m_srcState->history.size();
+    if (inputFrames * m_inputChannels >= historySize) {
+        // Use last part of input as new history
+        std::memcpy(m_srcState->history.data(),
+                   input + (inputFrames * m_inputChannels - historySize),
+                   historySize * sizeof(float));
+    } else {
+        // Shift existing history and append new input
+        const size_t shiftSize = historySize - inputFrames * m_inputChannels;
+        std::memmove(m_srcState->history.data(), m_srcState->history.data() + inputFrames * m_inputChannels,
+                    shiftSize * sizeof(float));
+        std::memcpy(m_srcState->history.data() + shiftSize, input, inputFrames * m_inputChannels * sizeof(float));
     }
 
     return true;
@@ -1537,21 +1863,137 @@ void AudioEngine::AdjustBufferSize() {
         return;
     }
 
+    // Get current performance metrics
+    AudioStats stats = GetStats();
+    int currentUnderruns = m_underruns.load();
+    int currentOverruns = m_overruns.load();
+    int bufferUnderruns = m_bufferUnderruns.load();
+    int bufferOverruns = m_bufferOverruns.load();
+    float cpuLoad = stats.cpuLoad;
+
+    // Calculate total problem indicators
+    int totalProblems = currentUnderruns + currentOverruns + bufferUnderruns + bufferOverruns;
+
+    // Don't adjust if we haven't had enough problems to warrant a change
+    if (totalProblems < ADAPTIVE_BUFFER_THRESHOLD) {
+        return;
+    }
+
     int newBufferSize = m_bufferSize;
+    bool needsRestart = false;
 
-    // Increase buffer size if we have frequent underruns
-    if (m_underruns > m_overruns) {
-        newBufferSize = std::min(MAX_BUFFER_SIZE, m_bufferSize * 2);
+    // Analyze the problem patterns to determine optimal buffer size
+    if (currentUnderruns > currentOverruns || bufferUnderruns > bufferOverruns) {
+        // More underruns than overruns - increase buffer size for stability
+        if (cpuLoad > 0.8f) {
+            // High CPU load - be more aggressive with buffer increase
+            newBufferSize = std::min(MAX_BUFFER_SIZE, m_bufferSize * 3 / 2);
+        } else {
+            // Normal CPU load - modest increase
+            newBufferSize = std::min(MAX_BUFFER_SIZE, m_bufferSize + 32);
+        }
+
+        LOG_INFO("Buffer underruns detected, increasing buffer size for stability");
     }
-    // Decrease buffer size if we have frequent overruns
-    else if (m_overruns > m_underruns && m_bufferSize > MIN_BUFFER_SIZE) {
-        newBufferSize = std::max(MIN_BUFFER_SIZE, m_bufferSize / 2);
+    else if (currentOverruns > currentUnderruns && m_bufferSize > MIN_BUFFER_SIZE) {
+        // More overruns than underruns - try to reduce latency
+        if (cpuLoad < 0.5f && stats.callbackDuration.count() < MAX_CALLBACK_TIME_MS * 300) {
+            // Low CPU load and good callback performance - can afford smaller buffer
+            newBufferSize = std::max(MIN_BUFFER_SIZE, m_bufferSize - 16);
+        } else {
+            // Don't reduce buffer if CPU is stressed
+            LOG_DEBUG("Overruns detected but CPU load too high to reduce buffer size");
+            return;
+        }
+
+        LOG_INFO("Buffer overruns detected, attempting to reduce latency");
+    }
+    else {
+        // Equal problems or other issues - use ring buffer status to decide
+        size_t inputAvailable = m_inputBuffer->available();
+        size_t outputAvailable = m_outputBuffer->available();
+        size_t inputCapacity = m_inputBuffer->capacity();
+        size_t outputCapacity = m_outputBuffer->capacity();
+
+        // Check ring buffer utilization
+        float inputUtilization = static_cast<float>(inputAvailable) / inputCapacity;
+        float outputUtilization = static_cast<float>(outputAvailable) / outputCapacity;
+
+        if (inputUtilization > 0.8f || outputUtilization > 0.8f) {
+            // Ring buffers are getting full - increase audio buffer size
+            newBufferSize = std::min(MAX_BUFFER_SIZE, m_bufferSize + 64);
+            LOG_INFO("Ring buffers near capacity, increasing audio buffer size");
+        } else if (inputUtilization < 0.2f && outputUtilization < 0.2f && cpuLoad < 0.6f) {
+            // Ring buffers underutilized and CPU not stressed - can reduce buffer
+            newBufferSize = std::max(MIN_BUFFER_SIZE, m_bufferSize - 32);
+            LOG_INFO("Ring buffers underutilized, reducing audio buffer size");
+        }
     }
 
+    // Validate the new buffer size is reasonable
     if (newBufferSize != m_bufferSize) {
-        LOG_INFO("Adaptive buffer size change: {} → {} samples", m_bufferSize, newBufferSize);
-        // Note: Actual buffer size change would require stream restart
-        // This is a simplified implementation
+        // Check if the new size is a power of 2 (preferred for some audio drivers)
+        int roundedSize = 1;
+        while (roundedSize < newBufferSize) {
+            roundedSize *= 2;
+        }
+
+        // If the rounded size is close to our target, use it
+        if (std::abs(roundedSize - newBufferSize) <= 16) {
+            newBufferSize = roundedSize;
+        }
+
+        // Ensure we don't change too drastically
+        int maxChange = m_bufferSize / 2;
+        if (newBufferSize > m_bufferSize + maxChange) {
+            newBufferSize = m_bufferSize + maxChange;
+        } else if (newBufferSize < m_bufferSize - maxChange) {
+            newBufferSize = m_bufferSize - maxChange;
+        }
+
+        LOG_INFO("Adaptive buffer size adjustment: {} → {} samples (underruns: {}, overruns: {}, CPU: {:.1f}%)",
+                 m_bufferSize, newBufferSize, currentUnderruns, currentOverruns, cpuLoad * 100.0f);
+
+        // Actually apply the buffer size change
+        // Note: This requires a stream restart in most audio APIs
+        if (m_running) {
+            LOG_INFO("Restarting stream for buffer size change");
+
+            // Save current state
+            bool wasRunning = m_running;
+            Stop();
+
+            // Update buffer size
+            m_bufferSize = newBufferSize;
+
+            // Resize internal buffers accordingly
+            m_conversionBufferInput.resize(m_bufferSize * 8);
+            m_conversionBufferOutput.resize(m_bufferSize * 8);
+            m_resampleBuffer.resize(m_bufferSize * 4);
+
+            // Clear ring buffers to prevent stale data
+            m_inputBuffer->reset();
+            m_outputBuffer->reset();
+            m_processingBuffer->reset();
+
+            // Reset statistics for clean measurement
+            ResetStats();
+
+            // Restart if it was running
+            if (wasRunning) {
+                if (!Start()) {
+                    LOG_ERROR("Failed to restart stream after buffer size change");
+                    // Try to revert to original buffer size
+                    m_bufferSize = m_bufferSize == newBufferSize ? DEFAULT_BUFFER_SIZE : m_bufferSize;
+                    if (!Start()) {
+                        LOG_ERROR("Failed to restart stream with original buffer size");
+                    }
+                }
+            }
+        } else {
+            // Just update the buffer size for next start
+            m_bufferSize = newBufferSize;
+        }
     }
 }
 

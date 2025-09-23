@@ -233,6 +233,18 @@ private:
                                   size_t inputFrames, size_t outputFrames);
 
     /**
+     * @brief Apply linear interpolation for sample rate conversion
+     */
+    bool ApplyLinearInterpolation(const float* input, float* output,
+                                 size_t inputFrames, size_t outputFrames);
+
+    /**
+     * @brief Apply polyphase interpolation for high-quality sample rate conversion
+     */
+    bool ApplyPolyphaseInterpolation(const float* input, float* output,
+                                   size_t inputFrames, size_t outputFrames);
+
+    /**
      * @brief Open audio stream with selected devices
      */
     bool OpenStream();

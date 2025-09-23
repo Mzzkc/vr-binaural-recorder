@@ -369,7 +369,7 @@ namespace StringUtils {
 }
 
 /**
- * @brief Audio utilities
+ * @brief Audio utilities with SIMD optimization
  */
 namespace AudioUtils {
 
@@ -380,34 +380,82 @@ namespace AudioUtils {
         Rectangular,
         Hann,
         Hamming,
-        Blackman
+        Blackman,
+        Tukey
     };
 
     void applyWindow(float* buffer, size_t size, WindowType windowType);
 
     /**
-     * @brief Calculate RMS level of audio buffer
+     * @brief SIMD-optimized RMS calculation
      */
     inline float calculateRMS(const float* buffer, size_t size) {
         if (size == 0) return 0.0f;
 
+#ifdef __AVX2__
+        __m256 sum = _mm256_setzero_ps();
+        const size_t simdSize = size & ~7;
+
+        for (size_t i = 0; i < simdSize; i += 8) {
+            __m256 samples = _mm256_loadu_ps(&buffer[i]);
+            sum = _mm256_fmadd_ps(samples, samples, sum);
+        }
+
+        // Horizontal sum
+        float result[8];
+        _mm256_storeu_ps(result, sum);
+        double totalSum = result[0] + result[1] + result[2] + result[3] +
+                         result[4] + result[5] + result[6] + result[7];
+
+        // Process remaining samples
+        for (size_t i = simdSize; i < size; ++i) {
+            totalSum += buffer[i] * buffer[i];
+        }
+
+        return std::sqrt(totalSum / size);
+#else
         double sum = 0.0;
         for (size_t i = 0; i < size; ++i) {
             sum += buffer[i] * buffer[i];
         }
-
         return std::sqrt(sum / size);
+#endif
     }
 
     /**
-     * @brief Calculate peak level of audio buffer
+     * @brief SIMD-optimized peak calculation
      */
     inline float calculatePeak(const float* buffer, size_t size) {
+        if (size == 0) return 0.0f;
+
+#ifdef __AVX2__
+        __m256 maxValues = _mm256_setzero_ps();
+        const size_t simdSize = size & ~7;
+
+        for (size_t i = 0; i < simdSize; i += 8) {
+            __m256 samples = _mm256_loadu_ps(&buffer[i]);
+            __m256 absSamples = _mm256_andnot_ps(_mm256_set1_ps(-0.0f), samples);
+            maxValues = _mm256_max_ps(maxValues, absSamples);
+        }
+
+        // Find maximum in vector
+        float result[8];
+        _mm256_storeu_ps(result, maxValues);
+        float peak = *std::max_element(result, result + 8);
+
+        // Process remaining samples
+        for (size_t i = simdSize; i < size; ++i) {
+            peak = std::max(peak, std::abs(buffer[i]));
+        }
+
+        return peak;
+#else
         float peak = 0.0f;
         for (size_t i = 0; i < size; ++i) {
             peak = std::max(peak, std::abs(buffer[i]));
         }
         return peak;
+#endif
     }
 
     /**
@@ -416,18 +464,134 @@ namespace AudioUtils {
     void applyGainWithFade(float* buffer, size_t size, float startGain, float endGain);
 
     /**
-     * @brief Mix two audio buffers
+     * @brief SIMD-optimized buffer mixing
      */
     inline void mixBuffers(float* destination, const float* source, size_t size, float gain = 1.0f) {
+#ifdef __AVX2__
+        const __m256 gainVector = _mm256_set1_ps(gain);
+        const size_t simdSize = size & ~7;
+
+        for (size_t i = 0; i < simdSize; i += 8) {
+            __m256 dest = _mm256_loadu_ps(&destination[i]);
+            __m256 src = _mm256_loadu_ps(&source[i]);
+            __m256 scaled = _mm256_mul_ps(src, gainVector);
+            __m256 result = _mm256_add_ps(dest, scaled);
+            _mm256_storeu_ps(&destination[i], result);
+        }
+
+        // Process remaining samples
+        for (size_t i = simdSize; i < size; ++i) {
+            destination[i] += source[i] * gain;
+        }
+#else
         for (size_t i = 0; i < size; ++i) {
             destination[i] += source[i] * gain;
         }
+#endif
     }
 
     /**
      * @brief Clear audio buffer with optional fade out
      */
     void clearBuffer(float* buffer, size_t size, bool fadeOut = false);
+
+    /**
+     * @brief SIMD-optimized buffer copying
+     */
+    inline void copyBuffer(float* destination, const float* source, size_t size) {
+#ifdef __AVX2__
+        const size_t simdSize = size & ~7;
+
+        for (size_t i = 0; i < simdSize; i += 8) {
+            __m256 data = _mm256_loadu_ps(&source[i]);
+            _mm256_storeu_ps(&destination[i], data);
+        }
+
+        // Copy remaining samples
+        for (size_t i = simdSize; i < size; ++i) {
+            destination[i] = source[i];
+        }
+#else
+        std::memcpy(destination, source, size * sizeof(float));
+#endif
+    }
+
+    /**
+     * @brief Apply DC removal filter
+     */
+    inline void removeDC(float* buffer, size_t size, float& dcState, float alpha = 0.995f) {
+        for (size_t i = 0; i < size; ++i) {
+            dcState = alpha * dcState + buffer[i];
+            buffer[i] -= dcState;
+        }
+    }
+}
+
+/**
+ * @brief Common performance utilities and patterns
+ */
+namespace PerfUtils {
+    /**
+     * @brief RAII lock guard wrapper for better debugging
+     */
+    template<typename Mutex>
+    class DebugLockGuard {
+    public:
+        explicit DebugLockGuard(Mutex& mutex, const char* location = "")
+            : m_guard(mutex), m_location(location) {
+#ifdef DEBUG_LOCKS
+            LOG_DEBUG("Acquired lock at: {}", m_location);
+#endif
+        }
+
+        ~DebugLockGuard() {
+#ifdef DEBUG_LOCKS
+            LOG_DEBUG("Released lock at: {}", m_location);
+#endif
+        }
+
+    private:
+        std::lock_guard<Mutex> m_guard;
+        const char* m_location;
+    };
+
+    /**
+     * @brief Fast atomic load/store helpers
+     */
+    template<typename T>
+    inline T atomicLoad(const std::atomic<T>& atomic, std::memory_order order = std::memory_order_relaxed) {
+        return atomic.load(order);
+    }
+
+    template<typename T>
+    inline void atomicStore(std::atomic<T>& atomic, T value, std::memory_order order = std::memory_order_relaxed) {
+        atomic.store(value, order);
+    }
+
+    /**
+     * @brief Cache line size detection
+     */
+    static constexpr size_t CACHE_LINE_SIZE = 64;  // Most common cache line size
+
+    /**
+     * @brief Aligned memory allocation
+     */
+    inline void* alignedAlloc(size_t size, size_t alignment = CACHE_LINE_SIZE) {
+#ifdef _WIN32
+        return _aligned_malloc(size, alignment);
+#else
+        void* ptr = nullptr;
+        return (posix_memalign(&ptr, alignment, size) == 0) ? ptr : nullptr;
+#endif
+    }
+
+    inline void alignedFree(void* ptr) {
+#ifdef _WIN32
+        _aligned_free(ptr);
+#else
+        free(ptr);
+#endif
+    }
 }
 
 /**
@@ -442,15 +606,23 @@ public:
     void deallocate(void* ptr);
     void reset();
 
-    size_t getUsedMemory() const { return m_used; }
+    size_t getUsedMemory() const { return m_used.load(std::memory_order_relaxed); }
     size_t getTotalMemory() const { return m_poolSize; }
-    bool isFull() const { return m_used >= m_poolSize; }
+    bool isFull() const { return m_used.load(std::memory_order_relaxed) >= m_poolSize; }
+    float getUsagePercentage() const {
+        return static_cast<float>(getUsedMemory()) / getTotalMemory() * 100.0f;
+    }
 
 private:
     void* m_pool;
     size_t m_poolSize;
     std::atomic<size_t> m_used;
-    std::mutex m_mutex;
+    mutable std::mutex m_mutex;
 };
+
+// Common lock guard macro
+#define SCOPED_LOCK(mutex) vrb::PerfUtils::DebugLockGuard<std::remove_reference_t<decltype(mutex)>> \
+    _lock_guard(mutex, __FILE__ ":" STRINGIFY(__LINE__))
+#define STRINGIFY(x) #x
 
 } // namespace vrb
