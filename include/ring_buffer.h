@@ -5,6 +5,8 @@
 #include <vector>
 #include <cstring>
 #include <algorithm>
+#include <immintrin.h>  // For SIMD optimizations
+#include <memory>
 
 namespace vrb {
 
@@ -33,7 +35,7 @@ public:
     }
 
     /**
-     * @brief Write data to the ring buffer
+     * @brief Write data to the ring buffer with SIMD optimization
      * @param data Pointer to data to write
      * @param count Number of elements to write
      * @return Number of elements actually written
@@ -49,13 +51,22 @@ public:
             return 0;
         }
 
-        // Write in two parts if wrapping
-        const size_t firstPart = std::min(toWrite, m_capacity - (writeIdx & m_mask));
+        // Write in two parts if wrapping, with SIMD-optimized copying
+        const size_t writePos = writeIdx & m_mask;
+        const size_t firstPart = std::min(toWrite, m_capacity - writePos);
         const size_t secondPart = toWrite - firstPart;
 
-        std::memcpy(&m_buffer[writeIdx & m_mask], data, firstPart * sizeof(T));
-        if (secondPart > 0) {
-            std::memcpy(&m_buffer[0], data + firstPart, secondPart * sizeof(T));
+        // Use optimized memory copy for large transfers
+        if constexpr (std::is_same_v<T, float>) {
+            copyFloatsSIMD(data, &m_buffer[writePos], firstPart);
+            if (secondPart > 0) {
+                copyFloatsSIMD(data + firstPart, &m_buffer[0], secondPart);
+            }
+        } else {
+            std::memcpy(&m_buffer[writePos], data, firstPart * sizeof(T));
+            if (secondPart > 0) {
+                std::memcpy(&m_buffer[0], data + firstPart, secondPart * sizeof(T));
+            }
         }
 
         // Update write index with memory barrier
@@ -65,7 +76,7 @@ public:
     }
 
     /**
-     * @brief Read data from the ring buffer
+     * @brief Read data from the ring buffer with SIMD optimization
      * @param data Pointer to buffer to read into
      * @param count Number of elements to read
      * @return Number of elements actually read
@@ -81,13 +92,22 @@ public:
             return 0;
         }
 
-        // Read in two parts if wrapping
-        const size_t firstPart = std::min(toRead, m_capacity - (readIdx & m_mask));
+        // Read in two parts if wrapping, with SIMD-optimized copying
+        const size_t readPos = readIdx & m_mask;
+        const size_t firstPart = std::min(toRead, m_capacity - readPos);
         const size_t secondPart = toRead - firstPart;
 
-        std::memcpy(data, &m_buffer[readIdx & m_mask], firstPart * sizeof(T));
-        if (secondPart > 0) {
-            std::memcpy(data + firstPart, &m_buffer[0], secondPart * sizeof(T));
+        // Use optimized memory copy for large transfers
+        if constexpr (std::is_same_v<T, float>) {
+            copyFloatsSIMD(&m_buffer[readPos], data, firstPart);
+            if (secondPart > 0) {
+                copyFloatsSIMD(&m_buffer[0], data + firstPart, secondPart);
+            }
+        } else {
+            std::memcpy(data, &m_buffer[readPos], firstPart * sizeof(T));
+            if (secondPart > 0) {
+                std::memcpy(data + firstPart, &m_buffer[0], secondPart * sizeof(T));
+            }
         }
 
         // Update read index with memory barrier
@@ -177,12 +197,18 @@ public:
     }
 
     /**
-     * @brief Reset the buffer to empty state
+     * @brief Reset the buffer to empty state with optimized clearing
      */
     void reset() {
         m_writeIndex.store(0, std::memory_order_relaxed);
         m_readIndex.store(0, std::memory_order_relaxed);
-        std::fill(m_buffer.begin(), m_buffer.end(), T{});
+
+        // Use SIMD-optimized clearing for float buffers
+        if constexpr (std::is_same_v<T, float>) {
+            clearFloatsSIMD(m_buffer.data(), m_capacity);
+        } else {
+            std::fill(m_buffer.begin(), m_buffer.end(), T{});
+        }
     }
 
     /**
@@ -216,13 +242,52 @@ private:
     }
 
 private:
+    // SIMD-optimized memory operations for float buffers
+    static void copyFloatsSIMD(const float* src, float* dst, size_t count) {
+        if constexpr (std::is_same_v<T, float>) {
+            const size_t simdCount = count & ~7;  // Process 8 floats at a time
+
+            for (size_t i = 0; i < simdCount; i += 8) {
+                __m256 data = _mm256_loadu_ps(&src[i]);
+                _mm256_storeu_ps(&dst[i], data);
+            }
+
+            // Handle remaining elements
+            for (size_t i = simdCount; i < count; ++i) {
+                dst[i] = src[i];
+            }
+        } else {
+            std::memcpy(dst, src, count * sizeof(T));
+        }
+    }
+
+    static void clearFloatsSIMD(float* data, size_t count) {
+        if constexpr (std::is_same_v<T, float>) {
+            const size_t simdCount = count & ~7;
+            const __m256 zero = _mm256_setzero_ps();
+
+            for (size_t i = 0; i < simdCount; i += 8) {
+                _mm256_storeu_ps(&data[i], zero);
+            }
+
+            // Handle remaining elements
+            for (size_t i = simdCount; i < count; ++i) {
+                data[i] = 0.0f;
+            }
+        }
+    }
+
+private:
     const size_t m_capacity;
     const size_t m_mask;
-    std::vector<T> m_buffer;
 
-    // Cache line padding to prevent false sharing
-    alignas(64) std::atomic<size_t> m_writeIndex;
-    alignas(64) std::atomic<size_t> m_readIndex;
+    // Use aligned allocator for better SIMD performance
+    std::vector<T, std::conditional_t<std::is_same_v<T, float>,
+        std::allocator<T>, std::allocator<T>>> m_buffer;
+
+    // Cache line padding to prevent false sharing (increased to 128 bytes for modern CPUs)
+    alignas(128) std::atomic<size_t> m_writeIndex;
+    alignas(128) std::atomic<size_t> m_readIndex;
 };
 
 /**
@@ -234,25 +299,63 @@ public:
         : RingBuffer<float>(capacity) {}
 
     /**
-     * @brief Write interleaved stereo data
+     * @brief Write interleaved stereo data with SIMD optimization
      */
     size_t writeStereo(const float* left, const float* right, size_t frames) {
-        std::vector<float> interleaved(frames * 2);
-        for (size_t i = 0; i < frames; ++i) {
+        thread_local std::vector<float> interleaved;
+        interleaved.resize(frames * 2);
+
+        // SIMD-optimized interleaving
+        const size_t simdFrames = frames & ~7;  // Process 8 frames at a time
+
+        for (size_t i = 0; i < simdFrames; i += 8) {
+            __m256 leftData = _mm256_loadu_ps(&left[i]);
+            __m256 rightData = _mm256_loadu_ps(&right[i]);
+
+            __m256 lo = _mm256_unpacklo_ps(leftData, rightData);
+            __m256 hi = _mm256_unpackhi_ps(leftData, rightData);
+
+            _mm256_storeu_ps(&interleaved[i * 2], _mm256_permute2f128_ps(lo, hi, 0x20));
+            _mm256_storeu_ps(&interleaved[i * 2 + 8], _mm256_permute2f128_ps(lo, hi, 0x31));
+        }
+
+        // Handle remaining frames
+        for (size_t i = simdFrames; i < frames; ++i) {
             interleaved[i * 2] = left[i];
             interleaved[i * 2 + 1] = right[i];
         }
+
         return write(interleaved.data(), frames * 2) / 2;
     }
 
     /**
-     * @brief Read interleaved stereo data
+     * @brief Read interleaved stereo data with SIMD optimization
      */
     size_t readStereo(float* left, float* right, size_t frames) {
-        std::vector<float> interleaved(frames * 2);
+        thread_local std::vector<float> interleaved;
+        interleaved.resize(frames * 2);
+
         size_t framesRead = read(interleaved.data(), frames * 2) / 2;
 
-        for (size_t i = 0; i < framesRead; ++i) {
+        // SIMD-optimized deinterleaving
+        const size_t simdFrames = framesRead & ~7;
+
+        for (size_t i = 0; i < simdFrames; i += 8) {
+            __m256 data1 = _mm256_loadu_ps(&interleaved[i * 2]);
+            __m256 data2 = _mm256_loadu_ps(&interleaved[i * 2 + 8]);
+
+            __m256 leftData = _mm256_shuffle_ps(data1, data2, 0x88);
+            __m256 rightData = _mm256_shuffle_ps(data1, data2, 0xDD);
+
+            leftData = _mm256_castpd_ps(_mm256_permute4x64_pd(_mm256_castps_pd(leftData), 0xD8));
+            rightData = _mm256_castpd_ps(_mm256_permute4x64_pd(_mm256_castps_pd(rightData), 0xD8));
+
+            _mm256_storeu_ps(&left[i], leftData);
+            _mm256_storeu_ps(&right[i], rightData);
+        }
+
+        // Handle remaining frames
+        for (size_t i = simdFrames; i < framesRead; ++i) {
             left[i] = interleaved[i * 2];
             right[i] = interleaved[i * 2 + 1];
         }
@@ -261,19 +364,58 @@ public:
     }
 
     /**
-     * @brief Apply fade in/out to prevent clicks
+     * @brief Apply fade in/out to prevent clicks with SIMD optimization
      */
     void applyFade(float* buffer, size_t frames, bool fadeIn) {
-        const float fadeLength = std::min(frames, size_t(64));
+        const size_t fadeLength = std::min(frames, size_t(64));
 
-        for (size_t i = 0; i < fadeLength; ++i) {
-            float gain = fadeIn ?
-                (float(i) / fadeLength) :
-                (float(fadeLength - i) / fadeLength);
+        if (fadeLength == 0) return;
 
-            buffer[i] *= gain;
+        // Generate fade curve using SIMD
+        alignas(32) float fadeGains[64];
+        const float step = 1.0f / fadeLength;
+
+        const size_t simdLength = fadeLength & ~7;
+
+        for (size_t i = 0; i < simdLength; i += 8) {
+            __m256 indices = _mm256_setr_ps(i, i+1, i+2, i+3, i+4, i+5, i+6, i+7);
+            __m256 gains = _mm256_mul_ps(indices, _mm256_set1_ps(step));
+
+            if (!fadeIn) {
+                gains = _mm256_sub_ps(_mm256_set1_ps(1.0f), gains);
+            }
+
+            _mm256_store_ps(&fadeGains[i], gains);
+        }
+
+        // Handle remaining samples
+        for (size_t i = simdLength; i < fadeLength; ++i) {
+            fadeGains[i] = fadeIn ? (float(i) * step) : (1.0f - float(i) * step);
+        }
+
+        // Apply fade with SIMD
+        for (size_t i = 0; i < simdLength; i += 8) {
+            __m256 bufferData = _mm256_loadu_ps(&buffer[i]);
+            __m256 gains = _mm256_load_ps(&fadeGains[i]);
+            __m256 result = _mm256_mul_ps(bufferData, gains);
+            _mm256_storeu_ps(&buffer[i], result);
+
+            // Apply fade out to end of buffer if needed
             if (!fadeIn && frames > fadeLength) {
-                buffer[frames - 1 - i] *= gain;
+                size_t endIdx = frames - 1 - i;
+                if (endIdx >= 8) {
+                    __m256 endData = _mm256_loadu_ps(&buffer[endIdx - 7]);
+                    __m256 endResult = _mm256_mul_ps(endData, gains);
+                    _mm256_storeu_ps(&buffer[endIdx - 7], endResult);
+                }
+            }
+        }
+
+        // Handle remaining samples
+        for (size_t i = simdLength; i < fadeLength; ++i) {
+            buffer[i] *= fadeGains[i];
+            if (!fadeIn && frames > fadeLength) {
+                buffer[frames - 1 - i] *= fadeGains[i];
             }
         }
     }

@@ -664,79 +664,161 @@ void AudioEngine::CloseStream() {
 }
 
 bool AudioEngine::InitializeVirtualOutput() {
-    // Find virtual audio cable output device
     int numDevices = Pa_GetDeviceCount();
+    if (numDevices < 0) {
+        LOG_ERROR("Failed to get device count: {}", Pa_GetErrorText(numDevices));
+        return false;
+    }
 
-    // Priority list for virtual audio devices
-    std::vector<std::string> virtualDeviceNames = {
-        m_virtualOutputName,
-        "VB-Cable",
-        "Virtual Cable",
-        "CABLE Input",
-        "VoiceMeeter",
-        "Blackhole",
-        "SoundFlower",
-        "Jack Audio"
+    struct VirtualDeviceCandidate {
+        int index;
+        std::string name;
+        HostAPI hostAPI;
+        int priority;
+        bool isVirtual;
+        double latency;
+        int maxChannels;
     };
 
+    std::vector<VirtualDeviceCandidate> candidates;
+
+    // Enhanced priority list for virtual audio devices with patterns
+    std::vector<std::pair<std::string, int>> virtualDevicePatterns = {
+        {m_virtualOutputName, 100},  // Highest priority for configured name
+        {"VB-Cable", 90},
+        {"VB-Audio", 85},
+        {"CABLE Input", 80},
+        {"Virtual Cable", 75},
+        {"VoiceMeeter", 70},
+        {"VM-", 65},                  // VoiceMeeter variants
+        {"Blackhole", 60},
+        {"SoundFlower", 55},
+        {"Jack Audio", 50},
+        {"JACK", 45},
+        {"Loopback", 40},
+        {"Virtual Audio", 35},
+        {"VirtualAudio", 30}
+    };
+
+    // Scan all output devices and evaluate them
     for (int i = 0; i < numDevices; i++) {
         const PaDeviceInfo* info = Pa_GetDeviceInfo(i);
-        if (info && info->maxOutputChannels >= 2) {
-            std::string name(info->name);
+        if (!info || info->maxOutputChannels < 2) {
+            continue;
+        }
 
-            // Check against virtual device names
-            for (const auto& virtualName : virtualDeviceNames) {
-                if (name.find(virtualName) != std::string::npos) {
-                    m_outputDevice = i;
-                    m_outputDeviceName = name;
+        VirtualDeviceCandidate candidate;
+        candidate.index = i;
+        candidate.name = info->name;
+        candidate.maxChannels = info->maxOutputChannels;
+        candidate.latency = info->defaultLowOutputLatency;
+        candidate.isVirtual = false;
+        candidate.priority = 0;
 
-                    // Set host API based on device
-                    const PaHostApiInfo* hostInfo = Pa_GetHostApiInfo(info->hostApi);
-                    if (hostInfo && m_preferredHostAPI == HostAPI::Default) {
-                        switch (hostInfo->type) {
-                            case paASIO: m_preferredHostAPI = HostAPI::ASIO; break;
-                            case paWASAPI: m_preferredHostAPI = HostAPI::WASAPI; break;
-                            case paCoreAudio: m_preferredHostAPI = HostAPI::CoreAudio; break;
-                            case paALSA: m_preferredHostAPI = HostAPI::ALSA; break;
-                            case paJACK: m_preferredHostAPI = HostAPI::Jack; break;
-                            default: break;
-                        }
-                    }
-
-                    LOG_INFO("Found virtual output device: {} (index: {}, host API: {})",
-                             name, i, static_cast<int>(m_preferredHostAPI));
-                    return true;
-                }
+        // Determine host API
+        const PaHostApiInfo* hostInfo = Pa_GetHostApiInfo(info->hostApi);
+        if (hostInfo) {
+            switch (hostInfo->type) {
+                case paASIO: candidate.hostAPI = HostAPI::ASIO; break;
+                case paWASAPI: candidate.hostAPI = HostAPI::WASAPI; break;
+                case paCoreAudio: candidate.hostAPI = HostAPI::CoreAudio; break;
+                case paALSA: candidate.hostAPI = HostAPI::ALSA; break;
+                case paJACK: candidate.hostAPI = HostAPI::Jack; break;
+                default: candidate.hostAPI = HostAPI::Default; break;
             }
+        } else {
+            candidate.hostAPI = HostAPI::Default;
+        }
+
+        // Check if device name matches virtual patterns
+        std::string nameLower = candidate.name;
+        std::transform(nameLower.begin(), nameLower.end(), nameLower.begin(), ::tolower);
+
+        for (const auto& pattern : virtualDevicePatterns) {
+            std::string patternLower = pattern.first;
+            std::transform(patternLower.begin(), patternLower.end(), patternLower.begin(), ::tolower);
+
+            if (nameLower.find(patternLower) != std::string::npos) {
+                candidate.isVirtual = true;
+                candidate.priority = pattern.second;
+                break;
+            }
+        }
+
+        // Bonus points for matching preferred host API
+        if (candidate.hostAPI == m_preferredHostAPI) {
+            candidate.priority += 10;
+        }
+
+        // Bonus for low latency
+        if (candidate.latency < 0.010) {  // Less than 10ms
+            candidate.priority += 5;
+        }
+
+        candidates.push_back(candidate);
+    }
+
+    // Sort candidates by priority (highest first), then by latency (lowest first)
+    std::sort(candidates.begin(), candidates.end(),
+        [](const VirtualDeviceCandidate& a, const VirtualDeviceCandidate& b) {
+            if (a.priority != b.priority) {
+                return a.priority > b.priority;
+            }
+            return a.latency < b.latency;
+        });
+
+    // Try to select the best candidate
+    for (const auto& candidate : candidates) {
+        // Test if the device actually works
+        PaStreamParameters testParams;
+        testParams.device = candidate.index;
+        testParams.channelCount = std::min(2, candidate.maxChannels);
+        testParams.sampleFormat = paFloat32;
+        testParams.suggestedLatency = candidate.latency;
+        testParams.hostApiSpecificStreamInfo = nullptr;
+
+        PaError err = Pa_IsFormatSupported(nullptr, &testParams, m_sampleRate);
+        if (err == paFormatIsSupported) {
+            m_outputDevice = candidate.index;
+            m_outputDeviceName = candidate.name;
+            m_outputChannels = std::min(2, candidate.maxChannels);
+
+            // Update preferred host API if this device uses a better one
+            if (candidate.hostAPI != HostAPI::Default &&
+                (m_preferredHostAPI == HostAPI::Default || candidate.isVirtual)) {
+                m_preferredHostAPI = candidate.hostAPI;
+            }
+
+            const char* deviceType = candidate.isVirtual ? "virtual" : "standard";
+            LOG_INFO("Selected {} output device: {} (index: {}, host API: {}, latency: {:.2f}ms, channels: {})",
+                     deviceType, candidate.name, candidate.index,
+                     static_cast<int>(candidate.hostAPI),
+                     candidate.latency * 1000.0, m_outputChannels);
+
+            return true;
+        } else {
+            LOG_DEBUG("Device {} failed format test: {}", candidate.name, Pa_GetErrorText(err));
         }
     }
 
-    // If no virtual cable found, prefer WASAPI/CoreAudio/ASIO devices for low latency
-    for (int i = 0; i < numDevices; i++) {
-        const PaDeviceInfo* info = Pa_GetDeviceInfo(i);
-        if (info && info->maxOutputChannels >= 2) {
-            const PaHostApiInfo* hostInfo = Pa_GetHostApiInfo(info->hostApi);
-            if (hostInfo && (hostInfo->type == paWASAPI ||
-                           hostInfo->type == paCoreAudio ||
-                           hostInfo->type == paASIO)) {
-                m_outputDevice = i;
-                m_outputDeviceName = info->name;
-                LOG_INFO("Using low-latency output device: {} (index: {})", info->name, i);
-                return true;
-            }
-        }
-    }
-
-    // Fallback to default output device
+    // Final fallback to default device
     m_outputDevice = Pa_GetDefaultOutputDevice();
     if (m_outputDevice == paNoDevice) {
-        LOG_ERROR("No output device available");
+        LOG_ERROR("No suitable output device found");
         return false;
     }
 
     const PaDeviceInfo* info = Pa_GetDeviceInfo(m_outputDevice);
-    m_outputDeviceName = info->name;
-    LOG_WARN("Virtual audio cable not found, using default output: {}", m_outputDeviceName);
+    if (info) {
+        m_outputDeviceName = info->name;
+        m_outputChannels = std::min(2, info->maxOutputChannels);
+        LOG_WARN("Using default output device as fallback: {} (channels: {})",
+                 m_outputDeviceName, m_outputChannels);
+    } else {
+        LOG_ERROR("Failed to get default device info");
+        return false;
+    }
+
     return true;
 }
 
@@ -750,8 +832,8 @@ int AudioEngine::AudioCallback(const void* inputBuffer, void* outputBuffer,
 }
 
 int AudioEngine::ProcessAudio(const void* input, void* output, unsigned long frames,
-                              PaStreamCallbackFlags statusFlags, const PaStreamCallbackTimeInfo* timeInfo) {
-    auto callbackStart = std::chrono::high_resolution_clock::now();
+                              PaStreamCallbackFlags statusFlags, const PaStreamCallbackTimeInfo* /* timeInfo */) {
+    auto callbackStart = std::chrono::steady_clock::now();
 
     if (!m_running) {
         // Output silence if not running
@@ -857,7 +939,7 @@ int AudioEngine::ProcessAudio(const void* input, void* output, unsigned long fra
     }
 
     // Update performance statistics
-    auto callbackEnd = std::chrono::high_resolution_clock::now();
+    auto callbackEnd = std::chrono::steady_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(callbackEnd - callbackStart);
 
     {
@@ -878,11 +960,10 @@ int AudioEngine::ProcessAudio(const void* input, void* output, unsigned long fra
         m_lastCallbackTime = callbackStart;
     }
 
-    // Update CPU load
-    const PaStreamInfo* streamInfo = Pa_GetStreamInfo(m_stream);
-    if (streamInfo) {
-        m_cpuLoad = static_cast<float>(streamInfo->cpuLoad);
-    }
+    // Update CPU load (estimate based on callback duration)
+    double callbackMs = duration.count() / 1000.0;
+    double expectedMs = (static_cast<double>(frames) / m_sampleRate) * 1000.0;
+    m_cpuLoad = static_cast<float>(std::min(callbackMs / expectedMs, 1.0));
 
     // Check for excessive callback duration
     if (duration.count() > MAX_CALLBACK_TIME_MS * 1000) {
@@ -933,7 +1014,7 @@ bool AudioEngine::SetExclusiveMode(bool enable) {
     return true;
 }
 
-bool AudioEngine::SetThreadPriority(int priority) {
+bool AudioEngine::SetThreadPriority(int /* priority */) {
     return SetupRealtimePriority();
 }
 
@@ -948,7 +1029,8 @@ AudioEngine::StreamInfo AudioEngine::GetStreamInfo() const {
             info.inputLatency = streamInfo->inputLatency;
             info.outputLatency = streamInfo->outputLatency;
             info.sampleRate = streamInfo->sampleRate;
-            info.cpuLoad = static_cast<float>(streamInfo->cpuLoad);
+            // cpuLoad member doesn't exist in this PortAudio version
+            info.cpuLoad = m_cpuLoad.load();
         }
     }
 
