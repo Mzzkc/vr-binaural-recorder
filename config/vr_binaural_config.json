@@ -1,158 +1,70 @@
 {
   "audio": {
-    "api": "auto",
     "sampleRate": 48000,
-    "bufferSize": 128,
-    "preferredInputDevice": "",
-    "virtualOutputName": "VR Binaural Output",
-    "exclusive": true,
-    "priorityBoost": true,
-    "useASIO": true,
-    "asioDevice": "",
-    "wasapiExclusive": true,
-    "channels": {
-      "input": "auto",
-      "output": 2
-    },
-    "format": {
-      "bitDepth": 32,
-      "float": true,
-      "dither": false
-    }
+    "bufferSize": 256,
+    "inputDevice": "default",
+    "outputDevice": "default",
+    "inputChannels": 1,
+    "outputChannels": 2,
+    "useASIO": false,
+    "useWASAPI": true,
+    "enableExclusiveMode": false
   },
-  
   "hrtf": {
-    "dataPath": "./hrtf_data",
-    "dataset": "auto",
+    "datasetConfigPath": "./hrtf_datasets_config.json",
+    "activeDataset": "mit_kemar_compact",
     "filterLength": 512,
-    "convolutionMethod": "auto",
-    "interpolationQuality": "cubic",
-    "enableDistanceAttenuation": true,
-    "distanceModel": "inverse",
-    "maxDistance": 10.0,
-    "referenceDistance": 1.0,
-    "rolloffFactor": 1.0,
-    "nearFieldCompensation": true,
-    "cachingStrategy": "aggressive",
-    "fftSize": 1024,
-    "minimumPhase": true
+    "enableInterpolation": true,
+    "convolutionMethod": "overlap_add",
+    "enableNearFieldCompensation": true,
+    "distanceAttenuationModel": "inverse_square",
+    "loadingStrategy": "on_demand",
+    "cachePreloadedMeasurements": true
   },
-  
   "vr": {
     "trackingRate": 90,
-    "smoothingFactor": 0.95,
+    "enablePrediction": true,
     "predictionTime": 0.011,
-    "poseUpdateMode": "callback",
-    "overlayScale": 0.5,
-    "overlayPosition": {
+    "smoothingFactor": 0.95,
+    "calibrationOffset": {
       "x": 0.0,
-      "y": 1.5,
-      "z": -1.0
+      "y": 0.0,
+      "z": 0.0
     },
-    "disableChaperone": false,
-    "disableVRCompositor": false,
-    "minimumTrackingLevel": "seated",
-    "trackingThreadPriority": "high",
-    "microphonePosition": {
-      "x": 0.0,
-      "y": 1.2,
-      "z": -1.0
-    },
-    "resetMicOnStart": false
+    "overlay": {
+      "enabled": true,
+      "width": 2.0,
+      "position": {
+        "x": 0.0,
+        "y": 1.5,
+        "z": -1.0
+      },
+      "autoHide": true,
+      "autoHideDelay": 5000
+    }
   },
-  
   "performance": {
-    "threadPriority": "realtime",
-    "cpuAffinity": "0xFFF0",
-    "simdLevel": "auto",
-    "preallocateBuffers": true,
-    "useMemoryPool": true,
-    "ringBufferSize": 4096,
-    "maxAudioFrames": 2048,
-    "simdAlignment": 32,
-    "prefetchDistance": 256,
-    "useHugePages": false,
-    "denormalHandling": "flushToZero"
+    "audioThreadPriority": "high",
+    "vrThreadPriority": "normal",
+    "enableSIMD": true,
+    "enableFastMath": true,
+    "memoryPoolSize": 8388608,
+    "enableProfiling": false
   },
-  
   "logging": {
     "level": "info",
     "path": "./logs",
-    "async": true,
-    "maxFileSize": "10MB",
+    "enableAsync": true,
+    "rotationSize": 10485760,
     "maxFiles": 5,
-    "console": true,
-    "file": true,
-    "format": "[%Y-%m-%d %H:%M:%S.%e] [%^%l%$] [%t] %v"
+    "enableConsole": true,
+    "enableFile": true
   },
-  
   "debug": {
-    "enableMetrics": false,
-    "metricsInterval": 1000,
-    "profiling": false,
-    "profileOutputPath": "./profiles/",
-    "profileInterval": 10000,
-    "verboseAudio": false,
-    "verboseVR": false,
-    "dumpHRTF": false,
-    "skipAudioProcessing": false,
-    "testMode": false
-  },
-  
-  "network": {
-    "enableRemoteControl": false,
-    "controlPort": 8080,
-    "enableOSC": false,
-    "oscPort": 9000,
-    "oscAddress": "/vr/binaural",
-    "enableWebsocket": false,
-    "websocketPort": 8081
-  },
-  
-  "ui": {
-    "theme": "dark",
-    "fontSize": 14,
-    "showAdvanced": false,
-    "autoHide": true,
-    "autoHideDelay": 5000,
-    "transparency": 0.95
-  },
-  
-  "automation": {
-    "enableAutomation": false,
-    "recordPath": "./automation",
-    "recordFormat": "json",
-    "playbackSpeed": 1.0,
-    "loop": false
-  },
-  
-  "startup": {
-    "autoStart": true,
-    "minimized": false,
-    "checkForUpdates": true,
-    "loadLastConfig": true,
-    "restoreWindowPosition": true
-  },
-  
-  "fallback": {
-    "useDefaultDeviceOnError": true,
-    "reduceQualityOnOverload": true,
-    "disableEffectsOnOverload": false,
-    "emergencyBufferSize": 512
-  },
-  
-  "experimental": {
-    "enableGPUProcessing": false,
-    "enableAIEnhancement": false,
-    "enableRoomSimulation": false,
-    "roomSize": "medium",
-    "reverb": {
-      "enabled": false,
-      "wetLevel": 0.1,
-      "roomSize": 0.5,
-      "damping": 0.5
-    },
-    "enableHeadTracking": true,
-    "enableHandTracking": false
+    "enableMetrics": true,
+    "enableValidation": true,
+    "enableVerboseAudio": false,
+    "enableVerboseVR": false,
+    "enableProfiling": false
   }
 }

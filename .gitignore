@@ -159,4 +159,4 @@ vgcore.*
 # Application-specific ignores
 vr_binaural_config_local.json
 *.session
-*.workspace
+*.workspacedeps/hrtf_data/

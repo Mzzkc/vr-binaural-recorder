@@ -102,30 +102,72 @@ endif()
 
 FetchContent_MakeAvailable(portaudio spdlog jsoncpp imgui glfw)
 
-# Source files
+# Source files organized by module
+set(CORE_SOURCES
+    core/src/main.cpp
+    core/src/application.cpp
+    core/src/config.cpp
+    core/src/logger.cpp
+)
+
+set(AUDIO_SOURCES
+    modules/audio/audio_engine.cpp
+    modules/audio/hrtf_processor.cpp
+)
+
+set(VR_SOURCES
+    modules/vr/vr_tracker.cpp
+)
+
+set(UI_SOURCES
+    modules/ui/overlay_ui.cpp
+)
+
+set(COMMON_SOURCES
+    modules/common/utils.cpp
+)
+
 set(SOURCES
-    src/main.cpp
-    src/application.cpp
-    src/audio_engine.cpp
-    src/hrtf_processor.cpp
-    src/vr_tracker.cpp
-    src/overlay_ui.cpp
-    src/config.cpp
-    src/logger.cpp
-    src/utils.cpp
+    ${CORE_SOURCES}
+    ${AUDIO_SOURCES}
+    ${VR_SOURCES}
+    ${UI_SOURCES}
+    ${COMMON_SOURCES}
+)
+
+# Header files organized by module
+set(CORE_HEADERS
+    core/include/application.h
+    core/include/config.h
+    core/include/logger.h
+    core/include/vr_types.h
+    core/include/ring_buffer.h
+)
+
+set(AUDIO_HEADERS
+    modules/audio/audio_engine.h
+    modules/audio/hrtf_processor.h
+)
+
+set(VR_HEADERS
+    modules/vr/vr_tracker.h
+)
+
+set(UI_HEADERS
+    modules/ui/overlay_ui.h
+)
+
+set(COMMON_HEADERS
+    modules/common/utils.h
+    modules/common/simd/audio_simd.h
 )
 
 set(HEADERS
-    include/audio_engine.h
-    include/application.h
-    include/hrtf_processor.h
-    include/vr_tracker.h
-    include/overlay_ui.h
-    include/config.h
-    include/logger.h
-    include/vr_types.h
-    include/ring_buffer.h
-    include/utils.h
+    ${CORE_HEADERS}
+    ${AUDIO_HEADERS}
+    ${VR_HEADERS}
+    ${UI_HEADERS}
+    ${COMMON_HEADERS}
 )
 
 # ImGui sources
@@ -144,7 +186,12 @@ add_executable(vr_binaural_recorder ${SOURCES} ${HEADERS} ${IMGUI_SOURCES})
 
 # Include directories
 target_include_directories(vr_binaural_recorder PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/vr
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/common/simd
     ${OPENVR_INCLUDE_DIRS}
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
@@ -230,19 +277,24 @@ enable_testing()
 add_executable(vr_binaural_tests
     tests/test_suite.cpp
     # Exclude main.cpp from sources for tests to avoid multiple main functions
-    src/application.cpp
-    src/audio_engine.cpp
-    src/hrtf_processor.cpp
-    src/vr_tracker.cpp
-    src/overlay_ui.cpp
-    src/config.cpp
-    src/logger.cpp
-    src/utils.cpp
+    core/src/application.cpp
+    core/src/config.cpp
+    core/src/logger.cpp
+    modules/audio/audio_engine.cpp
+    modules/audio/hrtf_processor.cpp
+    modules/vr/vr_tracker.cpp
+    modules/ui/overlay_ui.cpp
+    modules/common/utils.cpp
     ${IMGUI_SOURCES}
 )
 
 target_include_directories(vr_binaural_tests PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/core/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/audio
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/vr
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/ui
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/common
+    ${CMAKE_CURRENT_SOURCE_DIR}/modules/common/simd
     ${OPENVR_INCLUDE_DIRS}
     ${imgui_SOURCE_DIR}
     ${imgui_SOURCE_DIR}/backends
