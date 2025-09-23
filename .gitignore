@@ -1,0 +1,162 @@
+# VR Binaural Recorder - Git Ignore Configuration
+
+# Build directories and artifacts
+build/
+Build/
+out/
+debug/
+release/
+bin/
+lib/
+
+# Platform-specific build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+*.obj
+*.o
+*.pdb
+*.ilk
+*.exp
+*.map
+
+# CMake generated files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+compile_commands.json
+
+# IDE and editor files
+.vscode/
+.vs/
+.idea/
+*.vcxproj*
+*.sln
+*.suo
+*.user
+*.ncb
+*.aps
+*.plg
+*.opt
+*.clw
+*.bak
+*~
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*.log
+.cache/
+
+# Runtime logs and data
+logs/*.log
+logs/*.txt
+logs/archive/
+*.pid
+
+# Audio and VR data files (large binaries)
+hrtf_data/datasets/
+hrtf_data/cache/
+hrtf_data/*.dat
+hrtf_data/*.bin
+audio_cache/
+vr_calibration/
+
+# Configuration files with sensitive data
+config/*_private.json
+config/secrets.json
+*.key
+*.cert
+*.pem
+
+# Package managers
+node_modules/
+.npm/
+.yarn/
+
+# Python cache (for tools)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Test artifacts
+test_output/
+test_results/
+coverage/
+*.gcda
+*.gcno
+*.gcov
+
+# Performance profiling
+*.prof
+perf.data*
+gmon.out
+callgrind.out.*
+
+# Backup files
+*.bak
+*.backup
+*.orig
+
+# OS generated files
+.DS_Store?
+ehthumbs.db
+Icon?
+
+# Claude Code session files
+.claude/
+
+# Third-party dependencies (if downloaded/extracted)
+third_party/downloads/
+third_party/extracted/
+third_party/portaudio/
+third_party/openvr/lib/
+third_party/asio_sdk/
+
+# Documentation generation
+docs/generated/
+docs/html/
+docs/latex/
+*.pdf
+
+# Local development files
+local_config.json
+dev_notes.txt
+scratch/
+experiments/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env
+
+# Package files
+*.tar.gz
+*.zip
+*.7z
+*.rar
+
+# Core dumps and debug files
+core
+core.*
+vgcore.*
+*.dmp
+
+# Application-specific ignores
+vr_binaural_config_local.json
+*.session
+*.workspace

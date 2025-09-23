@@ -1,6 +1,6 @@
 # CMakeLists.txt - Build configuration for VR Binaural Recorder
 cmake_minimum_required(VERSION 3.16)
-project(VRBinauralRecorder VERSION 1.0.0 LANGUAGES CXX)
+project(VRBinauralRecorder VERSION 1.0.0 LANGUAGES C CXX)
 
 # C++ Standard
 set(CMAKE_CXX_STANDARD 17)
@@ -22,7 +22,8 @@ if(MSVC)
         add_link_options(/LTCG)
     endif()
 else()
-    add_compile_options(-Wall -Wextra -Wpedantic -Werror)
+    add_compile_options(-Wall -Wextra)
+    # Note: Removed -Wpedantic and -Werror to avoid issues with third-party dependencies
     add_compile_options(-march=native)  # Optimize for current CPU
     if(CMAKE_BUILD_TYPE STREQUAL "Release")
         add_compile_options(-O3 -flto)
@@ -61,18 +62,12 @@ FetchContent_Declare(
     GIT_TAG 1.9.5
 )
 
-# OpenVR
-if(WIN32)
-    set(OPENVR_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/openvr")
-    set(OPENVR_LIBRARIES "${OPENVR_ROOT_DIR}/lib/win64/openvr_api.lib")
-elseif(APPLE)
-    set(OPENVR_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/openvr")
-    set(OPENVR_LIBRARIES "${OPENVR_ROOT_DIR}/lib/osx32/libopenvr_api.dylib")
-else()
-    set(OPENVR_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/openvr")
-    set(OPENVR_LIBRARIES "${OPENVR_ROOT_DIR}/lib/linux64/libopenvr_api.so")
-endif()
+# OpenVR - Use stub headers for development
+set(OPENVR_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/openvr_stub")
 set(OPENVR_INCLUDE_DIRS "${OPENVR_ROOT_DIR}/headers")
+
+# Using stub implementation - no libraries needed for compilation
+set(OPENVR_LIBRARIES "")
 
 # ImGui with OpenGL backend
 FetchContent_Declare(
@@ -97,7 +92,12 @@ if(WIN32)
     set(GLEW_INCLUDE_DIRS "${GLEW_ROOT}/include")
     set(GLEW_LIBRARIES "${GLEW_ROOT}/lib/Release/x64/glew32.lib")
 else()
-    find_package(GLEW REQUIRED)
+    find_package(GLEW)
+    if(NOT GLEW_FOUND)
+        message(WARNING "GLEW not found, VR overlay functionality may be limited")
+        set(GLEW_INCLUDE_DIRS "")
+        set(GLEW_LIBRARIES "")
+    endif()
 endif()
 
 FetchContent_MakeAvailable(portaudio spdlog jsoncpp imgui glfw)
@@ -105,16 +105,19 @@ FetchContent_MakeAvailable(portaudio spdlog jsoncpp imgui glfw)
 # Source files
 set(SOURCES
     src/main.cpp
+    src/application.cpp
     src/audio_engine.cpp
     src/hrtf_processor.cpp
     src/vr_tracker.cpp
     src/overlay_ui.cpp
     src/config.cpp
     src/logger.cpp
+    src/utils.cpp
 )
 
 set(HEADERS
     include/audio_engine.h
+    include/application.h
     include/hrtf_processor.h
     include/vr_tracker.h
     include/overlay_ui.h
@@ -122,6 +125,7 @@ set(HEADERS
     include/logger.h
     include/vr_types.h
     include/ring_buffer.h
+    include/utils.h
 )
 
 # ImGui sources
@@ -200,6 +204,8 @@ elseif(UNIX AND NOT APPLE)
         GL
         GLU
     )
+
+    # Test target OpenGL linking will be handled later after target is defined
 endif()
 
 # Installation
@@ -222,17 +228,26 @@ enable_testing()
 
 # Test executable
 add_executable(vr_binaural_tests
-    tests/test_main.cpp
-    tests/test_audio_engine.cpp
-    tests/test_hrtf_processor.cpp
-    tests/test_ring_buffer.cpp
-    tests/test_config.cpp
-    ${SOURCES}
+    tests/test_suite.cpp
+    # Exclude main.cpp from sources for tests to avoid multiple main functions
+    src/application.cpp
+    src/audio_engine.cpp
+    src/hrtf_processor.cpp
+    src/vr_tracker.cpp
+    src/overlay_ui.cpp
+    src/config.cpp
+    src/logger.cpp
+    src/utils.cpp
+    ${IMGUI_SOURCES}
 )
 
 target_include_directories(vr_binaural_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${OPENVR_INCLUDE_DIRS}
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+    ${GLEW_INCLUDE_DIRS}
+    ${glfw_SOURCE_DIR}/include
 )
 
 target_link_libraries(vr_binaural_tests PRIVATE
@@ -241,6 +256,9 @@ target_link_libraries(vr_binaural_tests PRIVATE
     spdlog::spdlog
     jsoncpp_lib
     ${OPENVR_LIBRARIES}
+    glfw
+    ${GLEW_LIBRARIES}
+    ${OPENGL_LIBRARIES}
 )
 
 # Google Test
@@ -255,6 +273,16 @@ target_link_libraries(vr_binaural_tests PRIVATE
     gtest
     gtest_main
 )
+
+# Add platform-specific OpenGL libraries for tests (Linux)
+if(UNIX AND NOT APPLE)
+    target_link_libraries(vr_binaural_tests PRIVATE
+        ${OPENGL_LIBRARIES}
+        ${X11_LIBRARIES}
+        GL
+        GLU
+    )
+endif()
 
 add_test(NAME VRBinauralTests COMMAND vr_binaural_tests)
 
