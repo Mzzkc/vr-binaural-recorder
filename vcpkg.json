@@ -1,0 +1,96 @@
+{
+  "name": "vr-binaural-recorder",
+  "version": "1.0.0",
+  "description": "Professional VR Spatial Audio Recording with Windows Native Support",
+  "homepage": "https://github.com/vrbaudio/vr-binaural-recorder",
+  "license": "MIT",
+  "dependencies": [
+    {
+      "name": "portaudio",
+      "version>=": "19.7.0",
+      "features": ["asio"],
+      "platform": "windows"
+    },
+    {
+      "name": "portaudio",
+      "version>=": "19.7.0",
+      "platform": "!windows"
+    },
+    {
+      "name": "spdlog",
+      "version>=": "1.11.0"
+    },
+    {
+      "name": "jsoncpp",
+      "version>=": "1.9.5"
+    },
+    {
+      "name": "imgui",
+      "version>=": "1.89.5",
+      "features": ["glfw-binding", "opengl3-binding"]
+    },
+    {
+      "name": "glfw3",
+      "version>=": "3.3.8"
+    },
+    {
+      "name": "glew",
+      "version>=": "2.2.0",
+      "platform": "windows"
+    },
+    {
+      "name": "opengl",
+      "platform": "!windows"
+    },
+    {
+      "name": "gtest",
+      "version>=": "1.12.1"
+    },
+    {
+      "name": "ms-gsl",
+      "version>=": "4.0.0"
+    },
+    {
+      "name": "fmt",
+      "version>=": "9.1.0"
+    }
+  ],
+  "features": {
+    "windows-audio": {
+      "description": "Windows-specific audio features (WASAPI, ASIO, DirectSound)",
+      "dependencies": [
+        {
+          "name": "portaudio",
+          "features": ["asio", "wasapi", "directsound"]
+        }
+      ]
+    },
+    "vr-headsets": {
+      "description": "Premium VR headset support (Quest Pro, Bigscreen Beyond)",
+      "dependencies": []
+    },
+    "asio-sdk": {
+      "description": "ASIO SDK for professional audio interfaces",
+      "dependencies": [
+        {
+          "name": "portaudio",
+          "features": ["asio"]
+        }
+      ]
+    },
+    "installer": {
+      "description": "Windows installer dependencies",
+      "dependencies": [
+        {
+          "name": "wix",
+          "platform": "windows"
+        }
+      ]
+    },
+    "code-signing": {
+      "description": "Code signing tools for Windows distribution",
+      "dependencies": []
+    }
+  },
+  "builtin-baseline": "2023.04.15"
+}

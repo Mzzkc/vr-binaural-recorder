@@ -1,0 +1,128 @@
+#include <windows.h>
+#include "resource.h"
+
+// Application icon
+IDI_APP_ICON ICON "app.ico"
+
+// Version information
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     1,0,0,0
+PRODUCTVERSION  1,0,0,0
+FILEFLAGSMASK   0x3fL
+#ifdef _DEBUG
+FILEFLAGS       0x1L
+#else
+FILEFLAGS       0x0L
+#endif
+FILEOS          0x40004L
+FILETYPE        0x1L
+FILESUBTYPE     0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904b0"
+        BEGIN
+            VALUE "CompanyName",        "VRB Audio\0"
+            VALUE "FileDescription",   "VR Binaural Recorder - Professional VR Spatial Audio Recording\0"
+            VALUE "FileVersion",       "1.0.0.0\0"
+            VALUE "InternalName",      "vr_binaural_recorder\0"
+            VALUE "LegalCopyright",    "Copyright © 2024 VRB Audio. All rights reserved.\0"
+            VALUE "OriginalFilename",  "vr_binaural_recorder.exe\0"
+            VALUE "ProductName",       "VR Binaural Recorder\0"
+            VALUE "ProductVersion",    "1.0.0.0\0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1200
+    END
+END
+
+// Application manifest
+1 RT_MANIFEST "app.manifest"
+
+// Menu resources
+IDR_MAIN_MENU MENU
+BEGIN
+    POPUP "&File"
+    BEGIN
+        MENUITEM "&New Recording\tCtrl+N",      ID_FILE_NEW
+        MENUITEM "&Open...\tCtrl+O",           ID_FILE_OPEN
+        MENUITEM "&Save\tCtrl+S",              ID_FILE_SAVE
+        MENUITEM "Save &As...\tCtrl+Shift+S",  ID_FILE_SAVE_AS
+        MENUITEM SEPARATOR
+        MENUITEM "E&xit\tAlt+F4",              ID_FILE_EXIT
+    END
+    POPUP "&Audio"
+    BEGIN
+        MENUITEM "&Start Recording\tSpace",     ID_AUDIO_START
+        MENUITEM "S&top Recording\tEsc",       ID_AUDIO_STOP
+        MENUITEM "&Pause Recording\tP",        ID_AUDIO_PAUSE
+        MENUITEM SEPARATOR
+        MENUITEM "&Audio Settings...",         ID_AUDIO_SETTINGS
+        MENUITEM "&Device Configuration...",   ID_AUDIO_DEVICES
+    END
+    POPUP "&VR"
+    BEGIN
+        MENUITEM "&Connect Headset",           ID_VR_CONNECT
+        MENUITEM "&Disconnect Headset",        ID_VR_DISCONNECT
+        MENUITEM "&Tracking Settings...",      ID_VR_TRACKING
+        MENUITEM "&Spatial Audio Settings...", ID_VR_SPATIAL
+    END
+    POPUP "&View"
+    BEGIN
+        MENUITEM "&Device Panel",              ID_VIEW_DEVICES
+        MENUITEM "&Spatial Audio Panel",       ID_VIEW_SPATIAL
+        MENUITEM "&Recording Panel",           ID_VIEW_RECORDING
+        MENUITEM "&Monitoring Panel",          ID_VIEW_MONITORING
+        MENUITEM SEPARATOR
+        MENUITEM "&Full Screen\tF11",          ID_VIEW_FULLSCREEN
+    END
+    POPUP "&Tools"
+    BEGIN
+        MENUITEM "&Settings...\tF2",           ID_TOOLS_SETTINGS
+        MENUITEM "&Troubleshooting...",        ID_TOOLS_TROUBLESHOOT
+        MENUITEM "&Log Viewer...",             ID_TOOLS_LOGS
+        MENUITEM SEPARATOR
+        MENUITEM "&Check for Updates...",      ID_TOOLS_UPDATE
+    END
+    POPUP "&Help"
+    BEGIN
+        MENUITEM "&User Guide\tF1",            ID_HELP_GUIDE
+        MENUITEM "&Keyboard Shortcuts",        ID_HELP_SHORTCUTS
+        MENUITEM "&Hardware Requirements",     ID_HELP_HARDWARE
+        MENUITEM SEPARATOR
+        MENUITEM "&Report Issue...",           ID_HELP_REPORT
+        MENUITEM "&About VR Binaural Recorder...", ID_HELP_ABOUT
+    END
+END
+
+// Accelerator table
+IDR_MAIN_ACCEL ACCELERATORS
+BEGIN
+    "N",            ID_FILE_NEW,            VIRTKEY, CONTROL
+    "O",            ID_FILE_OPEN,           VIRTKEY, CONTROL
+    "S",            ID_FILE_SAVE,           VIRTKEY, CONTROL
+    "S",            ID_FILE_SAVE_AS,        VIRTKEY, CONTROL, SHIFT
+    VK_F4,          ID_FILE_EXIT,           VIRTKEY, ALT
+    VK_SPACE,       ID_AUDIO_START,         VIRTKEY
+    VK_ESCAPE,      ID_AUDIO_STOP,          VIRTKEY
+    "P",            ID_AUDIO_PAUSE,         VIRTKEY
+    VK_F11,         ID_VIEW_FULLSCREEN,     VIRTKEY
+    VK_F2,          ID_TOOLS_SETTINGS,      VIRTKEY
+    VK_F1,          ID_HELP_GUIDE,          VIRTKEY
+END
+
+// String table
+STRINGTABLE
+BEGIN
+    IDS_APP_TITLE           "VR Binaural Recorder"
+    IDS_WINDOW_CLASS        "VRBinauralRecorderWndClass"
+    IDS_TRAY_TOOLTIP        "VR Binaural Recorder - Professional VR Spatial Audio"
+    IDS_RECORDING_STARTED   "Recording started"
+    IDS_RECORDING_STOPPED   "Recording stopped"
+    IDS_VR_CONNECTED        "VR headset connected"
+    IDS_VR_DISCONNECTED     "VR headset disconnected"
+    IDS_AUDIO_ERROR         "Audio system error"
+    IDS_VR_ERROR           "VR system error"
+END

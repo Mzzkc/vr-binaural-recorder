@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# AppRun script for VR Binaural Recorder AppImage
+# This script sets up the environment and launches the application
+
+# Get the directory where this AppImage is mounted
+APPDIR="$(dirname "$(readlink -f "${0}")")"
+
+# Set up library paths
+export LD_LIBRARY_PATH="${APPDIR}/usr/lib:${APPDIR}/usr/lib/x86_64-linux-gnu:${LD_LIBRARY_PATH}"
+
+# Set up environment for audio
+export PULSE_RUNTIME_PATH="${XDG_RUNTIME_DIR}/pulse"
+export ALSA_DISABLE_PLUGINS=1
+
+# Set up working directory for configuration files
+if [ -z "$VR_BINAURAL_CONFIG_DIR" ]; then
+    export VR_BINAURAL_CONFIG_DIR="${HOME}/.config/vr-binaural-recorder"
+fi
+
+# Create config directory if it doesn't exist
+mkdir -p "$VR_BINAURAL_CONFIG_DIR"
+
+# Copy default config if user config doesn't exist
+if [ ! -f "$VR_BINAURAL_CONFIG_DIR/vr_binaural_config.json" ]; then
+    if [ -f "${APPDIR}/usr/share/vr-binaural-recorder/vr_binaural_config.json" ]; then
+        cp "${APPDIR}/usr/share/vr-binaural-recorder/vr_binaural_config.json" \
+           "$VR_BINAURAL_CONFIG_DIR/vr_binaural_config.json"
+    fi
+fi
+
+# Set up data paths
+export VR_BINAURAL_DATA_DIR="${APPDIR}/usr/share/vr-binaural-recorder"
+
+# Change to config directory to ensure relative paths work
+cd "$VR_BINAURAL_CONFIG_DIR"
+
+# Handle special arguments
+case "$1" in
+    --help|-h)
+        echo "VR Binaural Recorder - Professional VR Spatial Audio Recording"
+        echo ""
+        echo "Usage: $0 [options]"
+        echo ""
+        echo "Options:"
+        echo "  --help, -h      Show this help message"
+        echo "  --version, -v   Show version information"
+        echo "  --settings      Open settings dialog"
+        echo "  --config FILE   Use specific config file"
+        echo ""
+        echo "Configuration Directory: $VR_BINAURAL_CONFIG_DIR"
+        echo "Data Directory: $VR_BINAURAL_DATA_DIR"
+        exit 0
+        ;;
+    --version|-v)
+        "${APPDIR}/usr/bin/vr_binaural_recorder" --version
+        exit $?
+        ;;
+esac
+
+# Launch the application
+exec "${APPDIR}/usr/bin/vr_binaural_recorder" "$@"

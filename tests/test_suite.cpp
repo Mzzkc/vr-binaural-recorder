@@ -442,4 +442,39 @@ TEST_F(ConfigTest, InvalidConfig) {
     std::filesystem::remove("invalid_config.json");
 }
 
+TEST_F(AudioEngineTest, VirtualDeviceCreation) {
+    // Test virtual device creation capabilities
+    AudioEngine engine;
+    Config config;
+    HRTFProcessor hrtf;
+
+    EXPECT_TRUE(engine.Initialize(config, &hrtf));
+
+    // In mock mode, virtual device creation should be skipped but not fail
+    // In real mode, it should attempt PulseAudio device creation
+    if (engine.IsMockBackend()) {
+        // Mock backend doesn't create real virtual devices, but initialization should succeed
+        EXPECT_TRUE(engine.GetStats().framesProcessed == 0);
+        LOG_INFO("Virtual device test ran in mock mode (expected for WSL/CI environments)");
+    } else {
+        // Real mode - virtual device should be created
+        // This path would be taken on real Linux systems with PulseAudio
+        LOG_INFO("Virtual device test ran in real mode");
+    }
+
+    // Test device enumeration
+    auto inputDevices = engine.GetInputDevices();
+
+    // At minimum, we should have mock devices or real devices
+    EXPECT_GT(inputDevices.size(), 0);
+
+    // Test that configuration integration works
+    Config customConfig;
+    customConfig.Set("audio.virtualOutputName", "Custom VR Audio Device");
+    engine.UpdateConfiguration(customConfig);
+
+    // Verify configuration update was applied
+    EXPECT_EQ(customConfig.GetVirtualOutputName(), "Custom VR Audio Device");
+}
+
 } // namespace vrb

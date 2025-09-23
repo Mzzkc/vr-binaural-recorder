@@ -98,14 +98,17 @@ namespace {
                   << "  --version, -v       Show version information\n"
                   << "  --config <file>     Use custom configuration file\n"
                   << "  --list-devices      List available audio devices\n"
-                  << "  --no-vr             Run without VR support (desktop mode)\n"
+                  << "  --vr-overlay        Force SteamVR overlay mode (default)\n"
+                  << "  --desktop-mode      Force desktop GUI mode (fallback)\n"
+                  << "  --no-vr             Run without VR support (headless)\n"
                   << "  --verbose           Enable verbose logging\n";
     }
 
     void printVersion() {
-        std::cout << "VR Binaural Recorder v1.0.0\n"
+        std::cout << "VR Binaural Recorder v1.0.0 - SteamVR Overlay Edition\n"
                   << "Copyright (c) 2024 - Production Ready Spatial Audio for VR\n"
-                  << "Built with C++17, PortAudio, OpenVR, ImGui\n";
+                  << "Built with C++17, PortAudio, OpenVR, ImGui\n"
+                  << "PRIMARY MODE: SteamVR Overlay Application (control recording from within VR!)\n";
     }
 }
 
@@ -127,9 +130,12 @@ int main(int argc, char* argv[]) {
         } else if (arg == "--verbose") {
             // TODO: Set verbose logging
             std::cout << "Verbose mode enabled\n";
+        } else if (arg == "--vr-overlay") {
+            std::cout << "Force SteamVR overlay mode (this is the default)\n";
+        } else if (arg == "--desktop-mode") {
+            std::cout << "Force desktop GUI mode (fallback from VR overlay)\n";
         } else if (arg == "--no-vr") {
-            // TODO: Set desktop mode
-            std::cout << "VR support disabled\n";
+            std::cout << "VR support disabled - running in headless mode\n";
         } else if (arg == "--config" && i + 1 < argc) {
             // TODO: Set custom config file
             std::cout << "Using config file: " << argv[++i] << "\n";

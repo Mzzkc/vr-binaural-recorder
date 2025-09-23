@@ -1,0 +1,23 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=VR Binaural Recorder
+Comment=Professional VR Spatial Audio Recording
+Exec=vr_binaural_recorder
+Icon=vr_binaural_recorder
+Categories=AudioVideo;Audio;Music;Graphics;3DGraphics;
+Keywords=vr;virtual reality;binaural;3d audio;spatial audio;recording;hrtf;
+StartupNotify=true
+StartupWMClass=VRBinauralRecorder
+MimeType=audio/wav;audio/flac;application/json;
+Actions=Settings;Help;
+
+[Desktop Action Settings]
+Name=Settings
+Exec=vr_binaural_recorder --settings
+Icon=preferences-system
+
+[Desktop Action Help]
+Name=Help
+Exec=vr_binaural_recorder --help
+Icon=help-about

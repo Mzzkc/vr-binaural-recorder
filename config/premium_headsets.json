@@ -1,0 +1,186 @@
+{
+  "premiumHeadsetProfiles": {
+    "Meta Quest Pro": {
+      "vendor": "Meta",
+      "modelName": "Meta Quest Pro",
+      "description": "Premium wireless VR headset with off-ear audio and mixed reality",
+      "optimizations": {
+        "audioSettings": {
+          "bufferSize": 256,
+          "sampleRate": 48000,
+          "latencyCompensation": 12.0,
+          "offEarAudioBoost": 1.15,
+          "mixedRealityBlend": 0.15,
+          "spatialAccuracy": 1.3
+        },
+        "trackingSettings": {
+          "refreshRate": 90,
+          "predictionTime": 15.0,
+          "wirelessLatencyCompensation": true,
+          "handTrackingEnabled": true,
+          "eyeTrackingEnabled": true
+        },
+        "displaySettings": {
+          "resolution": [1800, 1920],
+          "refreshRates": [72, 90, 120],
+          "colorPassthrough": true,
+          "ipdRange": [58.0, 72.0],
+          "motorizedIPD": true
+        },
+        "connectionOptions": [
+          {
+            "type": "Air Link",
+            "wireless": true,
+            "maxBitrate": 500,
+            "latencyMs": 25
+          },
+          {
+            "type": "USB-C Link",
+            "wireless": false,
+            "maxBitrate": 1000,
+            "latencyMs": 15
+          }
+        ]
+      },
+      "supportedFeatures": [
+        "Wireless Air Link",
+        "USB-C Link Cable",
+        "Advanced Hand Tracking",
+        "Eye Tracking",
+        "Mixed Reality Passthrough",
+        "Motorized IPD Adjustment",
+        "Off-Ear Spatial Audio",
+        "High Refresh Rates (72/90/120Hz)",
+        "Snapdragon XR2+ Gen 1 Processor"
+      ],
+      "knownLimitations": [
+        "Requires Link Cable or Air Link for PC VR",
+        "Battery life: 1-2 hours active use",
+        "Wireless mode may introduce slight latency",
+        "Requires Wi-Fi 6E for optimal Air Link performance"
+      ],
+      "recommendedSettings": {
+        "audioQuality": "High",
+        "videoQuality": "High",
+        "preferredConnection": "USB-C Link",
+        "enableHandTracking": true,
+        "enableMixedReality": true
+      }
+    },
+
+    "Bigscreen Beyond": {
+      "vendor": "Bigscreen",
+      "modelName": "Bigscreen Beyond",
+      "description": "Ultra-premium lightweight OLED headset with sub-10ms latency",
+      "optimizations": {
+        "audioSettings": {
+          "bufferSize": 64,
+          "sampleRate": 96000,
+          "latencyCompensation": 3.0,
+          "ultraLowLatencyMode": 1.0,
+          "highFidelityMode": true,
+          "spatialAccuracy": 1.8
+        },
+        "trackingSettings": {
+          "refreshRate": 90,
+          "predictionTime": 8.0,
+          "lighthouseTracking": true,
+          "subPixelAccuracy": true
+        },
+        "displaySettings": {
+          "resolution": [2560, 2560],
+          "refreshRates": [75, 90],
+          "displayType": "Micro-OLED",
+          "weight": 127,
+          "customLenses": true
+        },
+        "audioSystem": {
+          "type": "DMAS",
+          "detachable": true,
+          "highFidelity": true,
+          "maxSampleRate": 96000,
+          "frequencyResponse": "Flat"
+        }
+      },
+      "supportedFeatures": [
+        "Micro-OLED Displays",
+        "Ultra-Lightweight (127g)",
+        "SteamVR 2.0 Lighthouse Tracking",
+        "Custom Prescription Lenses",
+        "DMAS High-Fidelity Audio",
+        "Sub-10ms Motion-to-Photon Latency",
+        "2560x2560 per eye resolution",
+        "DisplayPort 1.4+ Connection",
+        "Premium Build Quality"
+      ],
+      "knownLimitations": [
+        "Requires SteamVR Lighthouse base stations",
+        "Custom fit required (no IPD adjustment)",
+        "DMAS audio sold separately",
+        "Requires DisplayPort 1.4+ connection",
+        "Higher GPU requirements due to resolution"
+      ],
+      "recommendedSettings": {
+        "audioQuality": "Maximum",
+        "videoQuality": "Maximum",
+        "ultraLowLatency": true,
+        "highFidelityAudio": true,
+        "requiresLighthouses": true
+      }
+    }
+  },
+
+  "integrationGuide": {
+    "questPro": {
+      "setupSteps": [
+        "Install Meta Quest Link software",
+        "Configure Air Link or USB-C connection",
+        "Enable hand tracking in Quest settings",
+        "Calibrate IPD using motorized adjustment",
+        "Test mixed reality passthrough",
+        "Optimize audio settings for off-ear design"
+      ],
+      "troubleshooting": [
+        "Ensure Wi-Fi 6E for best Air Link performance",
+        "Check USB-C cable for PC Link",
+        "Verify Meta account and Quest Link app",
+        "Update Quest Pro firmware"
+      ]
+    },
+    "bigscreenBeyond": {
+      "setupSteps": [
+        "Set up SteamVR Lighthouse base stations",
+        "Install Bigscreen Beyond drivers",
+        "Configure custom prescription lenses",
+        "Connect DMAS audio system",
+        "Calibrate lighthouse tracking",
+        "Enable ultra-low latency mode"
+      ],
+      "troubleshooting": [
+        "Ensure DisplayPort 1.4+ connection",
+        "Check lighthouse base station sync",
+        "Verify custom lens installation",
+        "Test DMAS audio connection",
+        "Update SteamVR to latest version"
+      ]
+    }
+  },
+
+  "audioProfiles": {
+    "questProOffEar": {
+      "description": "Optimized for Quest Pro's off-ear spatial audio design",
+      "frequencyResponse": [1.1, 1.05, 1.0, 0.98, 0.95, 1.0, 1.02, 1.0, 0.98, 0.95],
+      "spatialBlend": 0.15,
+      "latency": 12.0,
+      "bufferSize": 256
+    },
+    "bigscreenBeyondDMAS": {
+      "description": "High-fidelity profile for Bigscreen Beyond DMAS",
+      "frequencyResponse": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
+      "spatialBlend": 0.0,
+      "latency": 3.0,
+      "bufferSize": 64,
+      "highFidelity": true
+    }
+  }
+}

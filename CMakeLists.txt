@@ -2,6 +2,16 @@
 cmake_minimum_required(VERSION 3.16)
 project(VRBinauralRecorder VERSION 1.0.0 LANGUAGES C CXX)
 
+# Windows-specific configuration
+if(WIN32)
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/WindowsConfig.cmake")
+endif()
+
+# vcpkg integration
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/vcpkg-toolchain.cmake")
+    include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/vcpkg-toolchain.cmake")
+endif()
+
 # C++ Standard
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -115,6 +125,13 @@ set(AUDIO_SOURCES
     modules/audio/hrtf_processor.cpp
 )
 
+# Windows-specific audio sources
+if(WIN32)
+    list(APPEND AUDIO_SOURCES
+        modules/audio/windows_wasapi_virtual_device.cpp
+    )
+endif()
+
 set(VR_SOURCES
     modules/vr/vr_tracker.cpp
 )
@@ -149,6 +166,13 @@ set(AUDIO_HEADERS
     modules/audio/hrtf_processor.h
 )
 
+# Windows-specific audio headers
+if(WIN32)
+    list(APPEND AUDIO_HEADERS
+        modules/audio/windows_wasapi_virtual_device.h
+    )
+endif()
+
 set(VR_HEADERS
     modules/vr/vr_tracker.h
 )
@@ -161,6 +185,13 @@ set(COMMON_HEADERS
     modules/common/utils.h
     modules/common/simd/audio_simd.h
 )
+
+# Windows-specific common headers
+if(WIN32)
+    list(APPEND COMMON_HEADERS
+        modules/common/windows_performance.h
+    )
+endif()
 
 set(HEADERS
     ${CORE_HEADERS}
@@ -181,8 +212,21 @@ set(IMGUI_SOURCES
     ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
 )
 
+# Windows resource files
+set(WINDOWS_RESOURCES "")
+if(WIN32)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/app.rc")
+        list(APPEND WINDOWS_RESOURCES "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/app.rc")
+    endif()
+endif()
+
 # Main executable
-add_executable(vr_binaural_recorder ${SOURCES} ${HEADERS} ${IMGUI_SOURCES})
+add_executable(vr_binaural_recorder ${SOURCES} ${HEADERS} ${IMGUI_SOURCES} ${WINDOWS_RESOURCES})
+
+# Apply Windows-specific target configuration
+if(WIN32)
+    configure_windows_target(vr_binaural_recorder)
+endif()
 
 # Include directories
 target_include_directories(vr_binaural_recorder PRIVATE
@@ -218,6 +262,8 @@ if(WIN32)
         ws2_32
         opengl32
         glu32
+        dwmapi
+        shell32
     )
     
     # ASIO SDK if available
@@ -338,8 +384,9 @@ endif()
 
 add_test(NAME VRBinauralTests COMMAND vr_binaural_tests)
 
-# Add standalone tests subdirectory
+# Add test subdirectories
 add_subdirectory(tests/standalone)
+add_subdirectory(tests)
 
 # CPack for packaging
 set(CPACK_PACKAGE_NAME "VRBinauralRecorder")
@@ -359,3 +406,8 @@ else()
 endif()
 
 include(CPack)
+
+# Windows packaging
+if(WIN32)
+    add_subdirectory(packaging/windows)
+endif()

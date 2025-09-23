@@ -1,57 +1,61 @@
-// vr_tracker.h - OpenVR Tracking Module
-// Handles VR headset and controller tracking for spatial positioning
+// vr_tracker.h - Simplified OpenVR Direct API Tracking
+// Direct OpenVR integration for HMD and controller tracking only
 
 #pragma once
 
 #include <openvr.h>
 #include <functional>
-#include <atomic>
-#include <thread>
 #include <mutex>
+#include <vector>
 #include "vr_types.h"
 
 namespace vrb {
 
 /**
- * @brief VR tracking interface for OpenVR/SteamVR
+ * @brief Simplified VR tracker using direct OpenVR API calls
+ * Focuses only on HMD + controller tracking for spatial audio
  */
 class VRTracker {
 public:
-    using TrackingCallback = std::function<void(const VRPose& head, const VRPose& mic)>;
+    using TrackingCallback = std::function<void(const VRPose& hmd, const std::vector<VRPose>& controllers)>;
 
     VRTracker();
     ~VRTracker();
 
+    // Core functionality
     bool Initialize();
-    void StartTracking();
-    void StopTracking();
-    void ProcessEvents();
+    void Update();  // Call this each frame to get latest poses
     void SetTrackingCallback(TrackingCallback callback);
-    VRPose GetHeadPose() const;
-    VRPose GetMicrophonePose() const;
-    void SetMicrophonePosition(const Vec3& position);
-    void ResetMicrophonePosition();
-    bool IsConnected() const { return m_vrSystem != nullptr; }
+
+    // Pose access
+    VRPose GetHMDPose() const;
+    std::vector<VRPose> GetControllerPoses() const;
+
+    // Simple state queries
+    bool IsInitialized() const { return m_vrSystem != nullptr; }
+    bool IsHMDConnected() const;
+    int GetConnectedControllerCount() const;
+
+    // Basic headset info for audio optimizations (extracted directly from OpenVR)
+    std::string GetHMDModel() const;
+    float GetHMDRefreshRate() const;
 
 private:
-    void TrackingThread();
-    void UpdatePoses();
-    VRPose ConvertMatrix(const vr::HmdMatrix34_t& matrix);
-    std::string GetTrackedDeviceString(uint32_t deviceIndex, vr::ETrackedDeviceProperty prop);
-    double GetCurrentTimeSeconds();
+    // Core OpenVR functionality only
+    VRPose ConvertOpenVRPose(const vr::TrackedDevicePose_t& vrPose);
+    void ExtractHMDPose(const vr::TrackedDevicePose_t poses[]);
+    void ExtractControllerPoses(const vr::TrackedDevicePose_t poses[]);
 
+    // OpenVR system
     vr::IVRSystem* m_vrSystem;
-    vr::TrackedDevicePoses_t m_trackedDevicePoses[vr::k_unMaxTrackedDeviceCount];
 
-    std::atomic<bool> m_initialized{false};
-    std::atomic<bool> m_tracking{false};
-    std::thread m_trackingThread;
-
-    TrackingCallback m_callback;
-
-    VRPose m_headPose;
-    VRPose m_microphonePose;
+    // Tracking data - updated each frame
+    VRPose m_hmdPose;
+    std::vector<VRPose> m_controllerPoses;
     mutable std::mutex m_poseMutex;
+
+    // Callback for audio engine
+    TrackingCallback m_callback;
 };
 
 } // namespace vrb

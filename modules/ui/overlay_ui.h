@@ -75,8 +75,14 @@ public:
     void RegisterParameterCallback(ParameterCallback callback);
 
 private:
-    // UI rendering methods
+    // UI rendering methods - enhanced for complete recording interface!
     void RenderMainWindow();
+    void RenderRecordingControlPanel();    // NEW! Main recording controls
+    void RenderSessionStatusPanel();       // NEW! Recording session info
+    void RenderAudioMonitoringPanel();     // Enhanced audio monitoring
+    void RenderTakeManagerPanel();         // NEW! Take management
+    void RenderSettingsPanel();            // Enhanced settings
+    void RenderFileManagementPanel();      // NEW! File naming and storage
     void RenderAudioPanel();
     void RenderVRPanel();
     void RenderHRTFPanel();
@@ -86,6 +92,28 @@ private:
     void RenderSpectrum();
     void RenderSpatialVisualization();
     void RenderLevelMeters();
+
+    // Recording workflow methods
+    void StartNewRecordingSession();
+    void StopRecordingSession();
+    void PauseRecordingSession();
+    void ResumeRecordingSession();
+    void StartNewTake();
+    void ReviewLastTake();
+    void DeleteCurrentTake();
+    void ApplyRecordingPreset(int presetIndex);
+
+    // File management
+    void UpdateStorageInfo();
+    void GenerateRecordingFilename();
+    bool CheckDiskSpace();
+    void CleanupOldRecordings();
+
+    // Audio monitoring
+    void UpdateAudioMetrics();
+    void CheckForClipping();
+    void CalculateSignalToNoise();
+    void UpdateFileSpacing();
 
     // OpenGL setup
     bool InitializeOpenGL();
@@ -196,6 +224,103 @@ private:
 
     // Callbacks
     std::vector<ParameterCallback> m_parameterCallbacks;
+
+    // Controller tracking for microphone positioning
+    void InitializeControllerTracking();
+    void UpdateControllerStates();
+    void UpdateMicrophonePositions();
+    void RenderMicrophoneVisualizations();
+    void HandleControllerPointer(float x, float y);
+    void HandleControllerClick(float x, float y, bool pressed);
+    void HandleControllerScroll(float xDelta, float yDelta);
+    void ToggleRecording();
+    void TogglePause();
+    void ApplyPreset(int presetType);
+
+    // Controller state tracking
+    uint32_t m_leftControllerIndex = UINT32_MAX;  // Invalid device index
+    uint32_t m_rightControllerIndex = UINT32_MAX; // Invalid device index
+    struct ControllerState {
+        float trigger = 0.0f;
+        bool isConnected = false;
+    } m_leftControllerState, m_rightControllerState;
+    bool m_leftControllerGrabbing = false;
+    bool m_rightControllerGrabbing = false;
+    Vec3 m_microphonePositions[2]; // Position of virtual microphones
+
+    // Recording state - enhanced for complete session management!
+    bool m_isRecording = false;
+    bool m_isPaused = false;
+
+    // Recording session management
+    struct RecordingSession {
+        std::chrono::steady_clock::time_point startTime;
+        std::chrono::steady_clock::time_point pauseStart;
+        std::chrono::duration<float> totalPausedTime{0};
+        int currentTake = 1;
+        std::string baseName = "VR_Recording";
+        std::string outputDirectory = "./recordings/";
+        bool autoIncrement = true;
+
+        // File format settings
+        int sampleRate = 48000;
+        int bitDepth = 24;
+        enum class Format { WAV, FLAC, OGG } format = Format::WAV;
+
+        // Quality monitoring
+        float peakInputLevel = 0.0f;
+        float peakOutputLevelL = 0.0f;
+        float peakOutputLevelR = 0.0f;
+        bool hasClipped = false;
+        float signalToNoiseRatio = 0.0f;
+
+        // Storage management
+        uint64_t estimatedFileSize = 0;
+        uint64_t availableSpace = 0;
+        bool lowSpaceWarning = false;
+    } m_recordingSession;
+
+    // Take management
+    std::vector<std::string> m_recordedTakes;
+    std::string m_lastRecordingPath;
+    bool m_showTakeManager = false;
+
+    // Quick playback for review
+    bool m_isPlayingback = false;
+    float m_playbackPosition = 0.0f;
+
+    // Recording presets - different settings for different scenarios
+    struct RecordingPreset {
+        std::string name;
+        int sampleRate;
+        int bitDepth;
+        RecordingSession::Format format;
+        float roomSize;
+        float reverbMix;
+        bool enableNoisereduction;
+        bool enableCompression;
+    };
+
+    std::vector<RecordingPreset> m_recordingPresets = {
+        {"Studio Quality", 48000, 24, RecordingSession::Format::WAV, 5.0f, 0.1f, false, false},
+        {"Live Performance", 44100, 16, RecordingSession::Format::FLAC, 20.0f, 0.3f, true, true},
+        {"Podcast/Voice", 44100, 16, RecordingSession::Format::OGG, 8.0f, 0.15f, true, true},
+        {"High Quality Archive", 96000, 32, RecordingSession::Format::WAV, 10.0f, 0.2f, false, false}
+    };
+    int m_selectedPreset = 0;
+
+    // Spatial audio parameters
+    float m_stereoWidth = 0.5f;
+    float m_roomSize = 10.0f;
+    float m_reverbMix = 0.2f;
+    bool m_overlayFollowHead = false;
+
+    // Preset types
+    enum PresetType {
+        Studio = 0,
+        ConcertHall = 1,
+        Outdoor = 2
+    };
 
     // Theme colors
     struct Theme {

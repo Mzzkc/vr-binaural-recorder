@@ -1,0 +1,199 @@
+#!/bin/bash
+# VR Binaural Recorder - Post-Commit Audit Trail
+# SECURITY LEVEL: CRITICAL
+# Records detailed audit trail of all code modifications
+
+set -e
+
+# Configuration
+AUDIT_DATABASE="/tmp/vr-binaural-commit-audit.json"
+AUDIT_LOG="/tmp/vr-binaural-audit.log"
+BACKUP_DIR="/tmp/vr-binaural-backups"
+
+# Ensure backup directory exists
+mkdir -p "$BACKUP_DIR"
+
+# Function to log with timestamp
+log_event() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" >> "$AUDIT_LOG"
+}
+
+# Function to create commit audit record
+create_audit_record() {
+    local commit_hash=$(git rev-parse HEAD)
+    local author_name=$(git log -1 --format='%an')
+    local author_email=$(git log -1 --format='%ae')
+    local commit_date=$(git log -1 --format='%ai')
+    local commit_message=$(git log -1 --format='%s')
+    local files_changed=$(git diff-tree --no-commit-id --name-only -r "$commit_hash" | wc -l)
+
+    # Get detailed file statistics
+    local file_stats=$(git diff-tree --no-commit-id --numstat -r "$commit_hash")
+
+    # Create JSON audit record
+    local audit_record=$(cat <<EOF
+{
+  "timestamp": "$(date -Iseconds)",
+  "commit_hash": "$commit_hash",
+  "author": {
+    "name": "$author_name",
+    "email": "$author_email"
+  },
+  "commit_date": "$commit_date",
+  "message": "$commit_message",
+  "statistics": {
+    "files_changed": $files_changed,
+    "file_details": [
+EOF
+)
+
+    # Add file details
+    local first=true
+    while IFS=$'\t' read -r additions deletions filename; do
+        if [[ "$first" == true ]]; then
+            first=false
+        else
+            audit_record+=","
+        fi
+
+        audit_record+=$(cat <<EOF
+
+      {
+        "filename": "$filename",
+        "additions": "$additions",
+        "deletions": "$deletions",
+        "is_protected": $(if [[ "$filename" == core/* ]] || [[ "$filename" == modules/* ]] || [[ "$filename" == tests/* ]] || [[ "$filename" == *.cpp ]] || [[ "$filename" == *.h ]]; then echo "true"; else echo "false"; fi)
+      }
+EOF
+)
+    done <<< "$file_stats"
+
+    audit_record+=$(cat <<EOF
+
+    ]
+  },
+  "backup_created": "$(date -Iseconds)",
+  "backup_path": "$BACKUP_DIR/$commit_hash.tar.gz"
+}
+EOF
+)
+
+    # Append to audit database
+    if [[ -f "$AUDIT_DATABASE" ]]; then
+        # Read existing records and append new one
+        local existing_content=$(cat "$AUDIT_DATABASE")
+        # Remove last ] and add comma, then new record, then close array
+        echo "${existing_content%]},${audit_record}]" > "$AUDIT_DATABASE"
+    else
+        # Create new audit database
+        echo "[$audit_record]" > "$AUDIT_DATABASE"
+    fi
+
+    log_event "Audit record created for commit: $commit_hash"
+}
+
+# Function to create backup of current state
+create_backup() {
+    local commit_hash=$(git rev-parse HEAD)
+    local backup_file="$BACKUP_DIR/$commit_hash.tar.gz"
+
+    # Create compressed backup of entire repository state
+    tar -czf "$backup_file" \
+        --exclude='.git' \
+        --exclude='build' \
+        --exclude='*.o' \
+        --exclude='*.so' \
+        --exclude='*.exe' \
+        -C "$(git rev-parse --show-toplevel)" .
+
+    log_event "Backup created: $backup_file"
+    return $backup_file
+}
+
+# Function to send alert for suspicious commits
+send_alert() {
+    local commit_hash=$(git rev-parse HEAD)
+    local author_email=$(git log -1 --format='%ae')
+    local files_changed=$(git diff-tree --no-commit-id --name-only -r "$commit_hash")
+
+    # Check for suspicious patterns
+    local suspicious=false
+    local alert_reasons=()
+
+    # Check for deleted test files
+    if echo "$files_changed" | grep -E "^.*test.*\.(cpp|h)$" | grep -v "^A" > /dev/null; then
+        suspicious=true
+        alert_reasons+=("Test files modified/deleted")
+    fi
+
+    # Check for massive changes
+    local total_changes=$(git diff-tree --no-commit-id --numstat -r "$commit_hash" | awk '{sum+=$1+$2} END {print sum}')
+    if [[ "$total_changes" -gt 300 ]]; then
+        suspicious=true
+        alert_reasons+=("Large commit: $total_changes lines changed")
+    fi
+
+    # Check for config system changes
+    if echo "$files_changed" | grep -E "config\.(cpp|h)" > /dev/null; then
+        suspicious=true
+        alert_reasons+=("Configuration system modified")
+    fi
+
+    if [[ "$suspicious" == true ]]; then
+        log_event "ALERT: Suspicious commit detected - $commit_hash by $author_email: ${alert_reasons[*]}"
+
+        # Create alert file for monitoring systems
+        cat > "/tmp/vr-binaural-alert.json" <<EOF
+{
+  "timestamp": "$(date -Iseconds)",
+  "alert_type": "SUSPICIOUS_COMMIT",
+  "commit_hash": "$commit_hash",
+  "author_email": "$author_email",
+  "reasons": [$(printf '"%s",' "${alert_reasons[@]}" | sed 's/,$//')]
+}
+EOF
+    fi
+}
+
+# Function to validate commit integrity
+validate_commit_integrity() {
+    local commit_hash=$(git rev-parse HEAD)
+
+    # Verify commit is properly signed (if signing is enabled)
+    if git config --get commit.gpgsign > /dev/null; then
+        if ! git verify-commit "$commit_hash" 2>/dev/null; then
+            log_event "WARNING: Commit $commit_hash is not properly signed"
+        fi
+    fi
+
+    # Check for any remaining unstaged changes
+    if ! git diff-index --quiet HEAD --; then
+        log_event "WARNING: Unstaged changes remain after commit"
+    fi
+}
+
+# Main audit function
+main() {
+    local commit_hash=$(git rev-parse HEAD)
+
+    log_event "Post-commit audit started for: $commit_hash"
+
+    # Create audit record
+    create_audit_record
+
+    # Create backup
+    create_backup
+
+    # Send alerts if suspicious
+    send_alert
+
+    # Validate commit integrity
+    validate_commit_integrity
+
+    log_event "Post-commit audit completed for: $commit_hash"
+
+    echo "Audit trail recorded for commit: $commit_hash"
+}
+
+# Execute main function
+main "$@"

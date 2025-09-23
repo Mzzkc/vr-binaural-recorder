@@ -119,6 +119,8 @@ private:
     InitResult initializeVRTracking();
     InitResult initializeAudioEngine();
     InitResult initializeOverlayUI();
+    InitResult initializeWindowsGUI();
+    InitResult initializeHeadsetSupport();
     InitResult connectComponents();
 
     // Shutdown phases

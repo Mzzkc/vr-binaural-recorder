@@ -20,6 +20,7 @@
 
 namespace vrb {
 
+
 /**
  * @brief HRTF processor for spatial audio rendering
  */
@@ -29,7 +30,7 @@ public:
     ~HRTFProcessor();
 
     bool Initialize(const std::string& hrtfDataPath);
-    void UpdateSpatialPosition(const VRPose& headPose, const VRPose& micPose);
+    void UpdateSpatialPosition(const VRPose& hmdPose, const std::vector<VRPose>& controllerPoses);
     void Process(const float* input, float* output, size_t frames, int inputChannels);
     void Reset();
 
@@ -133,6 +134,7 @@ private:
     std::atomic<float> m_currentElevation{0.0f};
     std::atomic<float> m_currentDistance{1.0f};
     std::atomic<int> m_currentFilterIndex{0};
+
 };
 
 } // namespace vrb

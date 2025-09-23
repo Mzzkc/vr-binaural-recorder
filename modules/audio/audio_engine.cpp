@@ -220,6 +220,9 @@ AudioEngine::~AudioEngine() {
         }
     }
 
+    // Remove virtual audio device if created
+    RemoveVirtualAudioDevice();
+
     // Cleanup platform-specific resources
 #ifdef _WIN32
     if (m_avrtHandle) {
@@ -346,6 +349,8 @@ bool AudioEngine::Initialize(const Config& config, HRTFProcessor* hrtf) {
              m_sampleRate, m_bufferSize, static_cast<int>(m_preferredHostAPI));
     return true;
 }
+
+
 
 bool AudioEngine::Start() {
     if (!m_initialized) {
@@ -750,6 +755,14 @@ void AudioEngine::CloseStream() {
 }
 
 bool AudioEngine::InitializeVirtualOutput() {
+    // First try to create our own virtual audio device
+    if (CreateVirtualAudioDevice()) {
+        LOG_INFO("Successfully created virtual audio device: {}", m_virtualOutputName);
+        // Refresh device list to include our new virtual device
+        // Give the system time to register the new device
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
+
     int numDevices = Pa_GetDeviceCount();
     if (numDevices < 0) {
         LOG_ERROR("Failed to get device count: {}", Pa_GetErrorText(numDevices));
@@ -2128,6 +2141,118 @@ bool AudioEngine::IsHeadlessEnvironment() const {
     return false;
 }
 
+bool AudioEngine::CreateVirtualAudioDevice() {
+    if (m_virtualDeviceCreated.load()) {
+        LOG_DEBUG("Virtual audio device already created");
+        return true;
+    }
+
+#ifdef __linux__
+    // For Linux, create a PulseAudio null sink that appears as a virtual output device
+    std::string deviceName = m_virtualOutputName;
+
+    // Sanitize device name for shell command
+    std::string sanitizedName = deviceName;
+    std::replace_if(sanitizedName.begin(), sanitizedName.end(),
+                   [](char c) { return !std::isalnum(c) && c != '_' && c != '-'; }, '_');
+
+    // Create the PulseAudio command to load a null sink module
+    std::string command = "pactl load-module module-null-sink sink_name=" + sanitizedName +
+                         " sink_properties=device.description=\"" + deviceName + "\"";
+
+    LOG_DEBUG("Creating virtual audio device with command: {}", command);
+
+    // Execute the command and capture the module ID
+    FILE* pipe = popen(command.c_str(), "r");
+    if (!pipe) {
+        LOG_WARN("Failed to execute pactl command for virtual device creation");
+        return false;
+    }
+
+    char buffer[128];
+    std::string result;
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        result += buffer;
+    }
+
+    int exitCode = pclose(pipe);
+    if (exitCode != 0) {
+        LOG_WARN("pactl command failed with exit code: {}", exitCode);
+        return false;
+    }
+
+    // Parse module ID from result
+    try {
+        int moduleId = std::stoi(result);
+        m_pulseModuleName = "module-null-sink." + std::to_string(moduleId);
+        m_virtualDevicePath = sanitizedName;
+        m_virtualDeviceCreated = true;
+
+        LOG_INFO("Created PulseAudio virtual device '{}' with module ID: {}", deviceName, moduleId);
+
+        // Also create a monitor source for potential input capture
+        std::string monitorCommand = "pactl load-module module-remap-source source_name=" +
+                                   sanitizedName + "_monitor master=" + sanitizedName + ".monitor " +
+                                   "source_properties=device.description=\"" + deviceName + " Monitor\"";
+
+        FILE* monitorPipe = popen(monitorCommand.c_str(), "r");
+        if (monitorPipe) {
+            pclose(monitorPipe); // We don't strictly need the monitor for beta, so ignore failure
+        }
+
+        return true;
+
+    } catch (const std::exception& e) {
+        LOG_ERROR("Failed to parse PulseAudio module ID: {}", e.what());
+        return false;
+    }
+
+#elif defined(_WIN32)
+    // For Windows, we would create a Virtual Audio Cable or use WASAPI loopback
+    // This is a placeholder for Windows implementation
+    LOG_WARN("Virtual device creation not yet implemented for Windows");
+    return false;
+
+#elif defined(__APPLE__)
+    // For macOS, we would use Audio Unit or CoreAudio virtual devices
+    // This is a placeholder for macOS implementation
+    LOG_WARN("Virtual device creation not yet implemented for macOS");
+    return false;
+
+#else
+    LOG_WARN("Virtual device creation not supported on this platform");
+    return false;
+#endif
+}
+
+bool AudioEngine::RemoveVirtualAudioDevice() {
+    if (!m_virtualDeviceCreated.load()) {
+        return true; // Nothing to remove
+    }
+
+#ifdef __linux__
+    if (!m_pulseModuleName.empty()) {
+        std::string command = "pactl unload-module " + m_pulseModuleName;
+
+        LOG_DEBUG("Removing virtual audio device with command: {}", command);
+
+        int exitCode = system(command.c_str());
+        if (exitCode == 0) {
+            LOG_INFO("Successfully removed virtual audio device");
+        } else {
+            LOG_WARN("Failed to remove virtual audio device (exit code: {})", exitCode);
+        }
+
+        m_pulseModuleName.clear();
+        m_virtualDevicePath.clear();
+        m_virtualDeviceCreated = false;
+        return exitCode == 0;
+    }
+#endif
+
+    return true;
+}
+
 bool AudioEngine::InitializeMockBackend() {
     m_mockBackend = true;
 
@@ -2313,6 +2438,20 @@ void AudioEngine::MockProcessingLoop() {
     }
 
     LOG_DEBUG("Mock processing thread stopped");
+}
+
+
+// Audio level monitoring for VR overlay meters
+float AudioEngine::GetInputLevel() const {
+    return m_inputLevel.load();
+}
+
+float AudioEngine::GetOutputLevelLeft() const {
+    return m_outputLevelLeft.load();
+}
+
+float AudioEngine::GetOutputLevelRight() const {
+    return m_outputLevelRight.load();
 }
 
 } // namespace vrb

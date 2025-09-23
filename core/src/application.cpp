@@ -70,7 +70,9 @@ InitResult Application::Initialize() {
         [this]() { return initializeHRTF(); },
         [this]() { return initializeVRTracking(); },
         [this]() { return initializeAudioEngine(); },
-        [this]() { return initializeOverlayUI(); },
+        [this]() { return initializeHeadsetSupport(); },
+        [this]() { return initializeOverlayUI(); }, // OVERLAY FIRST - Primary VR interface!
+        [this]() { return initializeWindowsGUI(); }, // Desktop GUI is optional fallback
         [this]() { return connectComponents(); }
     };
 
@@ -112,46 +114,64 @@ void Application::Run() {
         m_vrTracker->StartTracking();
     }
 
-    // Main loop
-    while (m_running.load() && m_state.load() == ApplicationState::Running) {
-        Timer frameTimer;
+    // PRIMARY MODE: SteamVR Overlay Application!
+    if (m_overlay && m_vrTracker) {
+        LOG_INFO("Running as SteamVR OVERLAY APPLICATION - all controls accessible in VR!");
 
-        try {
-            // Update overlay UI
-            if (m_overlay) {
+        // This is the main VR overlay loop - users interact entirely in VR!
+        while (m_running.load() && m_state.load() == ApplicationState::Running) {
+            Timer frameTimer;
+
+            try {
+                // Update VR overlay (this is the primary UI!)
                 m_overlay->Update();
+
+                // Process VR events
+                processVREvents();
+
+                // Update metrics
+                updateMetrics();
+
+                // Handle configuration reload
+                handleConfigReload();
+
+                // Record frame time
+                double frameTime = frameTimer.elapsedMilliseconds();
+                m_frameTimeAverage.add(frameTime);
+
+                // Target 90fps for VR comfort and responsiveness
+                const double targetFrameTime = 11.11; // ~90fps for VR
+                if (frameTime < targetFrameTime) {
+                    std::this_thread::sleep_for(
+                        std::chrono::microseconds(static_cast<int>((targetFrameTime - frameTime) * 1000))
+                    );
+                }
+
+            } catch (const std::exception& e) {
+                LOG_ERROR("Exception in VR overlay loop: {}", e.what());
+                m_errorCount++;
+
+                if (m_errorCount > 10) {
+                    LOG_CRITICAL("Too many errors in VR mode, stopping application");
+                    setState(ApplicationState::Error);
+                    break;
+                }
             }
-
-            // Process VR events
-            processVREvents();
-
-            // Update metrics
-            updateMetrics();
-
-            // Handle configuration reload
-            handleConfigReload();
-
-            // Record frame time
-            double frameTime = frameTimer.elapsedMilliseconds();
-            m_frameTimeAverage.add(frameTime);
-
-            // Limit frame rate to ~60fps
-            const double targetFrameTime = 16.67; // ~60fps
-            if (frameTime < targetFrameTime) {
-                std::this_thread::sleep_for(
-                    std::chrono::milliseconds(static_cast<int>(targetFrameTime - frameTime))
-                );
-            }
-
-        } catch (const std::exception& e) {
-            LOG_ERROR("Exception in main loop: {}", e.what());
-            m_errorCount++;
-
-            if (m_errorCount > 10) {
-                LOG_CRITICAL("Too many errors, stopping application");
-                setState(ApplicationState::Error);
-                break;
-            }
+        }
+    }
+    // FALLBACK MODE: Desktop GUI (only if VR overlay failed)
+    else if (m_windowsGUI) {
+        LOG_WARN("VR overlay not available - falling back to desktop GUI mode");
+        LOG_INFO("Starting Windows GUI main loop");
+        int exitCode = m_windowsGUI->Run();
+        LOG_INFO("Windows GUI exited with code: {}", exitCode);
+        m_running.store(false);
+    }
+    // EMERGENCY MODE: Headless operation
+    else {
+        LOG_WARN("No UI available - running in headless mode");
+        while (m_running.load() && m_state.load() == ApplicationState::Running) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
 
@@ -328,6 +348,50 @@ InitResult Application::initializeOverlayUI() {
     }
 }
 
+InitResult Application::initializeWindowsGUI() {
+    PROFILE_SCOPE("WindowsGUI::Initialize");
+    try {
+        LOG_INFO("Initializing Windows GUI...");
+        m_windowsGUI = std::make_unique<WindowsGUI>();
+
+        if (!m_windowsGUI->Initialize(m_config.get())) {
+            return InitResult(false, "WindowsGUI", "Failed to initialize Windows GUI");
+        }
+
+        LOG_INFO("Windows GUI initialized successfully");
+        return InitResult(true, "WindowsGUI");
+    } catch (const std::exception& e) {
+        LOG_ERROR("Windows GUI initialization failed: {}", e.what());
+        return InitResult(false, "WindowsGUI", e.what());
+    }
+}
+
+InitResult Application::initializeHeadsetSupport() {
+    PROFILE_SCOPE("HeadsetSupport::Initialize");
+    try {
+        LOG_INFO("Initializing headset support systems...");
+        m_headsetSupport = std::make_unique<HeadsetSupportManager>();
+
+        if (!m_headsetSupport->Initialize()) {
+            LOG_WARN("Headset support initialization had issues, but continuing");
+            return InitResult(true, "HeadsetSupport", "Partial initialization");
+        }
+
+        // Detect connected headsets
+        if (m_headsetSupport->DetectConnectedHeadset()) {
+            auto headset = m_headsetSupport->GetConnectedHeadset();
+            LOG_INFO("Detected VR headset: {}", headset.modelName);
+        }
+
+        LOG_INFO("Headset support initialized successfully");
+        return InitResult(true, "HeadsetSupport");
+    } catch (const std::exception& e) {
+        LOG_WARN("Headset support initialization failed: {}", e.what());
+        // Headset support failure is not critical
+        return InitResult(true, "HeadsetSupport", "Failed: " + std::string(e.what()));
+    }
+}
+
 InitResult Application::connectComponents() {
     PROFILE_SCOPE("Components::Connect");
 
@@ -352,6 +416,24 @@ InitResult Application::connectComponents() {
             LOG_INFO("Overlay UI connected to audio engine");
         }
 
+        // Connect Windows GUI to audio engine and VR tracker
+        if (m_windowsGUI) {
+            if (m_audioEngine) {
+                m_windowsGUI->ConnectAudioEngine(std::shared_ptr<AudioEngine>(m_audioEngine.get(), [](AudioEngine*){}));
+                LOG_INFO("Windows GUI connected to audio engine");
+            }
+            if (m_vrTracker) {
+                m_windowsGUI->ConnectVRTracker(std::shared_ptr<VRTracker>(m_vrTracker.get(), [](VRTracker*){}));
+                LOG_INFO("Windows GUI connected to VR tracker");
+            }
+        }
+
+        // Connect headset support to audio engine
+        if (m_headsetSupport && m_audioEngine) {
+            m_headsetSupport->OptimizeAudioForHeadset(m_audioEngine.get());
+            LOG_INFO("Headset support connected to audio engine");
+        }
+
         return InitResult(true, "ComponentConnections");
     } catch (const std::exception& e) {
         return InitResult(false, "ComponentConnections", e.what());
@@ -369,12 +451,22 @@ void Application::shutdownComponents() {
         m_vrTracker->StopTracking();
     }
 
-    // Shutdown UI
+    // Shutdown UI components
+    if (m_windowsGUI) {
+        m_windowsGUI->Shutdown();
+    }
     if (m_overlay) {
         m_overlay->Shutdown();
     }
 
-    // Clean up components in reverse order
+    // Shutdown headset support
+    if (m_headsetSupport) {
+        m_headsetSupport->Shutdown();
+    }
+
+    // Clean up components in reverse order of initialization
+    m_windowsGUI.reset();
+    m_headsetSupport.reset();
     m_overlay.reset();
     m_audioEngine.reset();
     m_vrTracker.reset();

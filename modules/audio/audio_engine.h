@@ -107,6 +107,7 @@ public:
      */
     bool Initialize(const Config& config, HRTFProcessor* hrtf);
 
+
     /**
      * @brief Start audio processing
      * @return true if started successfully
@@ -144,6 +145,12 @@ public:
     void UpdateConfiguration(const Config& config);
 
     /**
+     * @brief Check if mock backend is active
+     * @return true if using mock backend for testing
+     */
+    bool IsMockBackend() const { return m_mockBackend; }
+
+    /**
      * @brief Get current audio statistics
      */
     struct AudioStats {
@@ -161,6 +168,14 @@ public:
         int droppedSamples;
     };
     AudioStats GetStats() const;
+
+
+    /**
+     * @brief Audio level monitoring for VR overlay meters
+     */
+    float GetInputLevel() const;
+    float GetOutputLevelLeft() const;
+    float GetOutputLevelRight() const;
 
     /**
      * @brief Set audio format and sample rate
@@ -218,6 +233,7 @@ private:
     int ProcessAudio(const void* input, void* output, unsigned long frames,
                      PaStreamCallbackFlags statusFlags, const PaStreamCallbackTimeInfo* timeInfo);
 
+
     /**
      * @brief Convert audio format
      */
@@ -258,6 +274,18 @@ private:
      * @brief Initialize virtual audio output device
      */
     bool InitializeVirtualOutput();
+
+    /**
+     * @brief Create platform-specific virtual audio device
+     * @return true if virtual device creation successful
+     */
+    bool CreateVirtualAudioDevice();
+
+    /**
+     * @brief Remove platform-specific virtual audio device
+     * @return true if virtual device removal successful
+     */
+    bool RemoveVirtualAudioDevice();
 
     /**
      * @brief Setup platform-specific audio optimizations
@@ -304,10 +332,6 @@ private:
      */
     bool InitializeMockBackend();
 
-    /**
-     * @brief Check if mock backend is active
-     */
-    bool IsMockBackend() const { return m_mockBackend; }
 
     /**
      * @brief Mock processing thread loop
@@ -400,6 +424,21 @@ private:
     std::thread m_mockProcessingThread;
     std::atomic<bool> m_mockProcessingRunning{false};
     std::chrono::steady_clock::time_point m_mockLastProcessTime;
+
+    // Virtual device state
+    std::atomic<bool> m_virtualDeviceCreated{false};
+    std::string m_virtualDevicePath;  // Platform-specific virtual device identifier
+
+
+    // Audio level monitoring for VR overlay
+    mutable std::mutex m_levelMutex;
+    std::atomic<float> m_inputLevel{0.0f};
+    std::atomic<float> m_outputLevelLeft{0.0f};
+    std::atomic<float> m_outputLevelRight{0.0f};
+#ifdef __linux__
+    pid_t m_pulseModulePid{-1};       // PulseAudio module PID for cleanup
+    std::string m_pulseModuleName;    // Module name for removal
+#endif
 };
 
 } // namespace vrb

@@ -1,0 +1,184 @@
+name: Beta Release Build
+
+on:
+  push:
+    tags:
+      - 'v*-beta*'
+      - 'v*-rc*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0-beta.1)'
+        required: true
+        default: 'v1.0.0-beta.1'
+
+jobs:
+  build-appimage:
+    runs-on: ubuntu-20.04
+    permissions:
+      contents: write
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          build-essential \
+          cmake \
+          pkg-config \
+          libasound2-dev \
+          libjack-jackd2-dev \
+          libx11-dev \
+          libgl1-mesa-dev \
+          libglu1-mesa-dev \
+          libxrandr-dev \
+          libxinerama-dev \
+          libxcursor-dev \
+          libxi-dev \
+          fuse
+
+    - name: Configure CMake
+      run: |
+        cmake -B build \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_CXX_COMPILER=g++ \
+          -DCMAKE_C_COMPILER=gcc
+
+    - name: Build application
+      run: |
+        cmake --build build --config Release --parallel $(nproc)
+
+    - name: Run tests
+      run: |
+        cd build
+        ctest --output-on-failure --parallel $(nproc)
+
+    - name: Create AppImage
+      run: |
+        chmod +x packaging/appimage/build_appimage.sh
+        ./packaging/appimage/build_appimage.sh
+
+    - name: Generate checksums
+      run: |
+        sha256sum VRBinauralRecorder-x86_64.AppImage > VRBinauralRecorder-x86_64.AppImage.sha256
+        md5sum VRBinauralRecorder-x86_64.AppImage > VRBinauralRecorder-x86_64.AppImage.md5
+
+    - name: Create release notes
+      run: |
+        cat > RELEASE_NOTES.md << 'EOF'
+        ## VR Binaural Recorder Beta Release
+
+        **Version**: ${{ github.ref_name || github.event.inputs.version }}
+        **Build Date**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        **Platform**: Linux x86_64
+
+        ### Features
+        - Professional VR spatial audio recording
+        - Real-time binaural processing with HRTF
+        - Multiple audio API support (ALSA, JACK, PulseAudio)
+        - OpenVR integration for head tracking
+        - AppImage packaging for universal Linux compatibility
+
+        ### Installation
+        ```bash
+        # Download and make executable
+        chmod +x VRBinauralRecorder-x86_64.AppImage
+
+        # Run the application
+        ./VRBinauralRecorder-x86_64.AppImage
+        ```
+
+        ### System Requirements
+        - Linux x86_64 (Ubuntu 20.04+, Fedora 35+, Arch Linux)
+        - OpenGL 3.3+ support
+        - FUSE2 filesystem support
+        - 4GB RAM (8GB recommended)
+        - VR headset (optional, for VR features)
+
+        ### Verification
+        ```bash
+        # Verify download integrity
+        sha256sum -c VRBinauralRecorder-x86_64.AppImage.sha256
+        ```
+
+        ### Beta Feedback
+        This is beta software. Please report issues at:
+        https://github.com/${{ github.repository }}/issues
+
+        ### Documentation
+        - [Installation Guide](BETA_INSTALLATION_GUIDE.md)
+        - [Distribution Architecture](BETA_DISTRIBUTION_ARCHITECTURE.md)
+        - [Cross-Platform Build Report](CROSS_PLATFORM_BUILD_REPORT.md)
+        EOF
+
+    - name: Upload to GitHub Releases
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: ${{ github.ref_name || github.event.inputs.version }}
+        name: "VR Binaural Recorder ${{ github.ref_name || github.event.inputs.version }}"
+        body_path: RELEASE_NOTES.md
+        draft: false
+        prerelease: true
+        files: |
+          VRBinauralRecorder-x86_64.AppImage
+          VRBinauralRecorder-x86_64.AppImage.sha256
+          VRBinauralRecorder-x86_64.AppImage.md5
+          BETA_INSTALLATION_GUIDE.md
+          BETA_DISTRIBUTION_ARCHITECTURE.md
+          CROSS_PLATFORM_BUILD_REPORT.md
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Update AppImageHub metadata
+      run: |
+        # Create AppImageHub compatible metadata
+        cat > VRBinauralRecorder.appdata.xml << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <component type="desktop-application">
+          <id>com.vrbaudio.VRBinauralRecorder</id>
+          <name>VR Binaural Recorder</name>
+          <summary>Professional VR Spatial Audio Recording</summary>
+          <description>
+            <p>
+              VR Binaural Recorder is a professional spatial audio recording application
+              that captures immersive 3D audio using VR head tracking and HRTF processing.
+            </p>
+            <p>Features:</p>
+            <ul>
+              <li>Real-time binaural audio processing</li>
+              <li>VR head tracking integration</li>
+              <li>Professional audio API support</li>
+              <li>Cross-platform compatibility</li>
+            </ul>
+          </description>
+          <launchable type="desktop-id">VRBinauralRecorder.desktop</launchable>
+          <categories>
+            <category>AudioVideo</category>
+            <category>Audio</category>
+            <category>Music</category>
+          </categories>
+          <keywords>
+            <keyword>vr</keyword>
+            <keyword>binaural</keyword>
+            <keyword>spatial audio</keyword>
+            <keyword>recording</keyword>
+            <keyword>3d audio</keyword>
+          </keywords>
+          <url type="homepage">https://github.com/${{ github.repository }}</url>
+          <url type="bugtracker">https://github.com/${{ github.repository }}/issues</url>
+          <releases>
+            <release version="${{ github.ref_name || github.event.inputs.version }}" date="$(date -u +%Y-%m-%d)"/>
+          </releases>
+        </component>
+        EOF
+
+    - name: Notify success
+      run: |
+        echo "🎉 Beta release build completed successfully!"
+        echo "📦 AppImage size: $(du -h VRBinauralRecorder-x86_64.AppImage | cut -f1)"
+        echo "🔗 Release URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name || github.event.inputs.version }}"
