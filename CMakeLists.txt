@@ -338,6 +338,9 @@ endif()
 
 add_test(NAME VRBinauralTests COMMAND vr_binaural_tests)
 
+# Add standalone tests subdirectory
+add_subdirectory(tests/standalone)
+
 # CPack for packaging
 set(CPACK_PACKAGE_NAME "VRBinauralRecorder")
 set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
