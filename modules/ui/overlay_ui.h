@@ -15,6 +15,7 @@
 #include "vr_tracker.h"
 #include "audio_engine.h"
 #include "config.h"
+#include "vr_types.h"
 
 namespace vrb {
 

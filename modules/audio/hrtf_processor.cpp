@@ -137,4 +137,33 @@ void HRTFProcessor::CalculateAngles(const VRPose& headPose, const VRPose& micPos
     distance = std::max(distance, 0.1f);
 }
 
+// ConvolutionEngine implementation
+HRTFProcessor::ConvolutionEngine::ConvolutionEngine(int filterLength)
+    : m_filterLength(filterLength), m_historyIndex(0), m_fftSize(filterLength * 2) {
+    LOG_DEBUG("ConvolutionEngine constructor - filter length: {}", filterLength);
+    m_historyBuffer.resize(filterLength, 0.0f);
+    m_overlapBuffer.resize(filterLength, 0.0f);
+}
+
+HRTFProcessor::ConvolutionEngine::~ConvolutionEngine() {
+    LOG_DEBUG("ConvolutionEngine destructor");
+}
+
+void HRTFProcessor::ConvolutionEngine::Process(const float* input, float* outputLeft, float* outputRight,
+                                               size_t frames, const HRTFData::Filter& filter) {
+    // Stub implementation - just copy input to outputs
+    for (size_t i = 0; i < frames; ++i) {
+        outputLeft[i] = input[i];
+        outputRight[i] = input[i];
+    }
+    (void)filter; // Suppress unused parameter warning
+}
+
+void HRTFProcessor::ConvolutionEngine::Reset() {
+    LOG_DEBUG("ConvolutionEngine::Reset called");
+    std::fill(m_historyBuffer.begin(), m_historyBuffer.end(), 0.0f);
+    std::fill(m_overlapBuffer.begin(), m_overlapBuffer.end(), 0.0f);
+    m_historyIndex = 0;
+}
+
 } // namespace vrb

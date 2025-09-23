@@ -2,7 +2,7 @@
 #include "utils.h"
 #include <cstring>
 #include <cstdlib>
-#include <immintrin.h>  // For SIMD optimizations
+#include <cmath>
 
 #ifndef _MSC_VER
 #include <unordered_map>
@@ -30,38 +30,26 @@ void applyWindow(float* buffer, size_t size, WindowType windowType) {
     const float twoPI_N = 2.0f * MathUtils::PI / N;
     const float fourPI_N = 4.0f * MathUtils::PI / N;
 
-    // SIMD-optimized windowing for common cases
-#ifdef __AVX2__
-    const size_t simdSize = size & ~7;
-
-    for (size_t i = 0; i < simdSize; i += 8) {
-        __m256 indices = _mm256_setr_ps(i, i+1, i+2, i+3, i+4, i+5, i+6, i+7);
-        __m256 samples = _mm256_loadu_ps(&buffer[i]);
-        __m256 window;
+    // Scalar windowing implementation
+    for (size_t i = 0; i < size; ++i) {
+        float window = 1.0f;
+        const float pos = static_cast<float>(i);
 
         switch (windowType) {
         case WindowType::Hann: {
-            __m256 angle = _mm256_mul_ps(indices, _mm256_set1_ps(twoPI_N));
-            __m256 cosVal = _mm256_cos_ps(angle);
-            window = _mm256_mul_ps(_mm256_set1_ps(0.5f),
-                                  _mm256_sub_ps(_mm256_set1_ps(1.0f), cosVal));
+            float angle = pos * twoPI_N;
+            window = 0.5f * (1.0f - cosf(angle));
             break;
         }
         case WindowType::Hamming: {
-            __m256 angle = _mm256_mul_ps(indices, _mm256_set1_ps(twoPI_N));
-            __m256 cosVal = _mm256_cos_ps(angle);
-            window = _mm256_sub_ps(_mm256_set1_ps(0.54f),
-                                  _mm256_mul_ps(_mm256_set1_ps(0.46f), cosVal));
+            float angle = pos * twoPI_N;
+            window = 0.54f - 0.46f * cosf(angle);
             break;
         }
         case WindowType::Blackman: {
-            __m256 angle1 = _mm256_mul_ps(indices, _mm256_set1_ps(twoPI_N));
-            __m256 angle2 = _mm256_mul_ps(indices, _mm256_set1_ps(fourPI_N));
-            __m256 cos1 = _mm256_cos_ps(angle1);
-            __m256 cos2 = _mm256_cos_ps(angle2);
-            window = _mm256_add_ps(_mm256_set1_ps(0.42f),
-                _mm256_add_ps(_mm256_mul_ps(_mm256_set1_ps(-0.5f), cos1),
-                             _mm256_mul_ps(_mm256_set1_ps(0.08f), cos2)));
+            float angle1 = pos * twoPI_N;
+            float angle2 = pos * fourPI_N;
+            window = 0.42f - 0.5f * cosf(angle1) + 0.08f * cosf(angle2);
             break;
         }
         case WindowType::Tukey: {
@@ -69,60 +57,17 @@ void applyWindow(float* buffer, size_t size, WindowType windowType) {
             const float alpha = 0.1f;
             const float fadeLength = alpha * N * 0.5f;
 
-            // Calculate window values for 8 samples
-            float windowValues[8];
-            for (int j = 0; j < 8; ++j) {
-                float n = i + j;
-                if (n < fadeLength) {
-                    windowValues[j] = 0.5f * (1.0f + std::cos(MathUtils::PI * (n / fadeLength - 1.0f)));
-                } else if (n > N - fadeLength) {
-                    windowValues[j] = 0.5f * (1.0f + std::cos(MathUtils::PI * ((n - N + fadeLength) / fadeLength)));
-                } else {
-                    windowValues[j] = 1.0f;
-                }
-            }
-            window = _mm256_loadu_ps(windowValues);
-            break;
-        }
-        default:
-            window = _mm256_set1_ps(1.0f);
-            break;
-        }
-
-        __m256 result = _mm256_mul_ps(samples, window);
-        _mm256_storeu_ps(&buffer[i], result);
-    }
-
-    // Process remaining samples
-    for (size_t i = simdSize; i < size; ++i) {
-#else
-    }
-    for (size_t i = 0; i < size; ++i) {
-#endif
-        float window = 1.0f;
-        const float n = static_cast<float>(i);
-
-        switch (windowType) {
-        case WindowType::Hann:
-            window = 0.5f * (1.0f - std::cos(twoPI_N * n));
-            break;
-        case WindowType::Hamming:
-            window = 0.54f - 0.46f * std::cos(twoPI_N * n);
-            break;
-        case WindowType::Blackman:
-            window = 0.42f - 0.5f * std::cos(twoPI_N * n) + 0.08f * std::cos(fourPI_N * n);
-            break;
-        case WindowType::Tukey: {
-            const float alpha = 0.1f;
-            const float fadeLength = alpha * N * 0.5f;
-            if (n < fadeLength) {
-                window = 0.5f * (1.0f + std::cos(MathUtils::PI * (n / fadeLength - 1.0f)));
-            } else if (n > N - fadeLength) {
-                window = 0.5f * (1.0f + std::cos(MathUtils::PI * ((n - N + fadeLength) / fadeLength)));
+            if (pos <= fadeLength) {
+                window = 0.5f * (1.0f + cosf(MathUtils::PI * (pos / fadeLength - 1.0f)));
+            } else if (pos >= N - fadeLength) {
+                window = 0.5f * (1.0f + cosf(MathUtils::PI * ((pos - N + fadeLength) / fadeLength)));
+            } else {
+                window = 1.0f;
             }
             break;
         }
         default:
+            window = 1.0f;
             break;
         }
 
