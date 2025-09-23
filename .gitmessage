@@ -1,0 +1,13 @@
+[ENGINEER]: Brief description (50 chars max)
+
+Detailed description of changes and rationale.
+Explain the why, not just the what.
+
+Engineer: [Your Full Name/Role]
+Files Modified: [List key files changed]
+Documentation Updated: [Yes/No and which files]
+Testing: [What testing was performed]
+Review Required: [Yes/No - specify if peer review needed]
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+Co-Authored-By: Claude <noreply@anthropic.com>

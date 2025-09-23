@@ -119,6 +119,17 @@ Icon?
 # Claude Code session files
 .claude/
 
+# Build artifacts and AppImage files
+*.AppImage
+squashfs-root/
+VRBinauralRecorder.AppDir/
+
+# Test artifacts
+test_config*.json
+test_results.xml
+qa_*test*
+invalid_config_test.json
+
 # Third-party dependencies (if downloaded/extracted)
 third_party/downloads/
 third_party/extracted/

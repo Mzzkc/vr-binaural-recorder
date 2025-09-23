@@ -1,0 +1,69 @@
+#!/bin/bash
+# VR Binaural Recorder - Git Accountability Pre-commit Hook
+# Validates commit message format and accountability requirements
+
+echo "🔍 Validating git accountability requirements..."
+
+# Get the commit message file
+commit_msg_file="$1"
+if [ -z "$commit_msg_file" ]; then
+    echo "ERROR: No commit message file provided"
+    exit 1
+fi
+
+# Read commit message
+commit_msg=$(cat "$commit_msg_file")
+
+# Check for required accountability fields
+missing_fields=()
+
+# Check for engineer attribution prefix
+if ! echo "$commit_msg" | grep -qE "^\[(VETERAN|ARCHITECT|CLEANUP|PM)\]:"; then
+    missing_fields+=("Engineer prefix ([VETERAN]:/[ARCHITECT]:/[CLEANUP]:/[PM]:)")
+fi
+
+# Check for engineer field
+if ! echo "$commit_msg" | grep -q "^Engineer:"; then
+    missing_fields+=("Engineer:")
+fi
+
+# Check for files modified field
+if ! echo "$commit_msg" | grep -q "^Files Modified:"; then
+    missing_fields+=("Files Modified:")
+fi
+
+# Check for testing documentation
+if ! echo "$commit_msg" | grep -q "^Testing:"; then
+    missing_fields+=("Testing:")
+fi
+
+# Check for Claude Code attribution
+if ! echo "$commit_msg" | grep -q "Generated with \[Claude Code\]"; then
+    missing_fields+=("Claude Code attribution")
+fi
+
+# Report any missing fields
+if [ ${#missing_fields[@]} -gt 0 ]; then
+    echo "❌ ERROR: Commit message missing required accountability fields:"
+    for field in "${missing_fields[@]}"; do
+        echo "   - $field"
+    done
+    echo ""
+    echo "📋 Required format:"
+    echo "[ENGINEER]: Brief description"
+    echo ""
+    echo "Detailed description."
+    echo ""
+    echo "Engineer: [Full Name/Role]"
+    echo "Files Modified: [List of files]"
+    echo "Testing: [What testing was performed]"
+    echo ""
+    echo "🤖 Generated with [Claude Code](https://claude.ai/code)"
+    echo "Co-Authored-By: Claude <noreply@anthropic.com>"
+    echo ""
+    echo "See GIT_ACCOUNTABILITY_PROCEDURES.md for complete requirements."
+    exit 1
+fi
+
+echo "✅ Git accountability requirements validated"
+exit 0
