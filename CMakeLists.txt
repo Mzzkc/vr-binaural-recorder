@@ -260,13 +260,13 @@ install(TARGETS vr_binaural_recorder
     RUNTIME DESTINATION bin
 )
 
-install(FILES 
-    "${CMAKE_CURRENT_SOURCE_DIR}/vr_binaural_config.json.example"
+install(FILES
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/vr_binaural_config.json.example"
     DESTINATION bin
     RENAME vr_binaural_config.json
 )
 
-install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/hrtf_data"
+install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/deps/hrtf"
     DESTINATION bin
 )
 

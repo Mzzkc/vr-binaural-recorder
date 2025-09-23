@@ -143,7 +143,7 @@ int main(int argc, char* argv[]) {
     // Application lifecycle management with RAII
     try {
         ApplicationManager manager;
-        vrb::g_application = manager.get();
+        // Note: g_application should be set by the Application itself during initialization
 
         if (!manager.initialize()) {
             return 1;
