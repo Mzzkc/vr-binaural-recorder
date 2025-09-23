@@ -267,7 +267,7 @@ void HRTFProcessor::UpdateSpatialPosition(const VRPose& headPose, const VRPose& 
 
 void HRTFProcessor::Process(const float* input, float* output, size_t frames, int inputChannels) {
     if (!m_initialized || !input || !output) {
-        // Output silence
+        // Output silence - optimized memset
         std::memset(output, 0, frames * 2 * sizeof(float));
         return;
     }
@@ -277,42 +277,68 @@ void HRTFProcessor::Process(const float* input, float* output, size_t frames, in
     // Get smoothed spatial values
     float azimuth, elevation, distance;
     m_interpolation->GetSmoothedValues(azimuth, elevation, distance);
-    
-    // Update current values for stats
-    m_currentAzimuth = azimuth;
-    m_currentElevation = elevation;
-    m_currentDistance = distance;
+
+    // Update current values for stats (atomic operations)
+    m_currentAzimuth.store(azimuth, std::memory_order_relaxed);
+    m_currentElevation.store(elevation, std::memory_order_relaxed);
+    m_currentDistance.store(distance, std::memory_order_relaxed);
 
     // Get appropriate HRTF filter
     const HRTFData::Filter& filter = m_hrtfData->GetFilter(azimuth, elevation);
-    m_currentFilterIndex = m_hrtfData->GetFilterIndex(azimuth, elevation);
+    m_currentFilterIndex.store(m_hrtfData->GetFilterIndex(azimuth, elevation), std::memory_order_relaxed);
 
-    // Prepare mono input buffer if stereo input
-    std::vector<float> monoBuffer;
+    // Prepare mono input buffer if stereo input - optimized SIMD conversion
+    thread_local std::vector<float> monoBuffer;
     const float* processInput = input;
-    
+
     if (inputChannels == 2) {
-        // Convert stereo to mono
         monoBuffer.resize(frames);
-        for (size_t i = 0; i < frames; ++i) {
+        // SIMD-optimized stereo to mono conversion
+        const size_t simdFrames = frames & ~7;  // Process 8 samples at a time
+
+        for (size_t i = 0; i < simdFrames; i += 8) {
+            __m256 left = _mm256_setr_ps(input[i*2], input[(i+1)*2], input[(i+2)*2], input[(i+3)*2],
+                                        input[(i+4)*2], input[(i+5)*2], input[(i+6)*2], input[(i+7)*2]);
+            __m256 right = _mm256_setr_ps(input[i*2+1], input[(i+1)*2+1], input[(i+2)*2+1], input[(i+3)*2+1],
+                                         input[(i+4)*2+1], input[(i+5)*2+1], input[(i+6)*2+1], input[(i+7)*2+1]);
+            __m256 mono = _mm256_mul_ps(_mm256_add_ps(left, right), _mm256_set1_ps(0.5f));
+            _mm256_storeu_ps(&monoBuffer[i], mono);
+        }
+
+        // Process remaining samples
+        for (size_t i = simdFrames; i < frames; ++i) {
             monoBuffer[i] = (input[i * 2] + input[i * 2 + 1]) * 0.5f;
         }
         processInput = monoBuffer.data();
     }
 
-    // Process convolution
-    std::vector<float> leftChannel(frames);
-    std::vector<float> rightChannel(frames);
-    
-    m_convolution->Process(processInput, leftChannel.data(), rightChannel.data(), 
+    // Process convolution with pre-allocated thread-local buffers
+    thread_local std::vector<float> leftChannel, rightChannel;
+    leftChannel.resize(frames);
+    rightChannel.resize(frames);
+
+    m_convolution->Process(processInput, leftChannel.data(), rightChannel.data(),
                           frames, filter);
 
-    // Apply distance attenuation
+    // Apply distance attenuation with SIMD
     ApplyDistanceAttenuation(leftChannel.data(), frames, distance);
     ApplyDistanceAttenuation(rightChannel.data(), frames, distance);
 
-    // Interleave output
-    for (size_t i = 0; i < frames; ++i) {
+    // Optimized SIMD interleaving
+    const size_t simdFrames = frames & ~7;
+    for (size_t i = 0; i < simdFrames; i += 8) {
+        __m256 left = _mm256_loadu_ps(&leftChannel[i]);
+        __m256 right = _mm256_loadu_ps(&rightChannel[i]);
+
+        __m256 lo = _mm256_unpacklo_ps(left, right);
+        __m256 hi = _mm256_unpackhi_ps(left, right);
+
+        _mm256_storeu_ps(&output[i * 2], _mm256_permute2f128_ps(lo, hi, 0x20));
+        _mm256_storeu_ps(&output[i * 2 + 8], _mm256_permute2f128_ps(lo, hi, 0x31));
+    }
+
+    // Process remaining samples
+    for (size_t i = simdFrames; i < frames; ++i) {
         output[i * 2] = leftChannel[i];
         output[i * 2 + 1] = rightChannel[i];
     }
@@ -823,23 +849,21 @@ void HRTFProcessor::CalculateAngles(const VRPose& headPose, const VRPose& micPos
 }
 
 void HRTFProcessor::ApplyDistanceAttenuation(float* buffer, size_t frames, float distance) {
-    // Apply inverse square law with near-field compensation
-    float attenuation = 1.0f / std::max(distance, 0.1f);
-    
-    // Limit maximum gain
-    attenuation = std::min(attenuation, 2.0f);
-    
-    // Apply attenuation using SIMD for performance
-    size_t simdFrames = frames & ~3;  // Process 4 samples at a time
-    __m128 gain = _mm_set1_ps(attenuation);
-    
-    for (size_t i = 0; i < simdFrames; i += 4) {
-        __m128 samples = _mm_loadu_ps(&buffer[i]);
-        samples = _mm_mul_ps(samples, gain);
-        _mm_storeu_ps(&buffer[i], samples);
+    // Apply inverse square law with near-field compensation and optimized SIMD
+    const float clampedDistance = std::max(distance, 0.1f);
+    const float attenuation = std::min(1.0f / clampedDistance, 2.0f);
+
+    // Use AVX2 for better performance - process 8 samples at a time
+    const size_t simdFrames = frames & ~7;
+    const __m256 gain = _mm256_set1_ps(attenuation);
+
+    for (size_t i = 0; i < simdFrames; i += 8) {
+        __m256 samples = _mm256_loadu_ps(&buffer[i]);
+        samples = _mm256_mul_ps(samples, gain);
+        _mm256_storeu_ps(&buffer[i], samples);
     }
-    
-    // Process remaining samples
+
+    // Process remaining samples with SSE fallback
     for (size_t i = simdFrames; i < frames; ++i) {
         buffer[i] *= attenuation;
     }
@@ -864,9 +888,7 @@ int HRTFProcessor::HRTFData::GetFilterIndex(float azimuth, float elevation) cons
 // ConvolutionEngine implementation with FFT support
 HRTFProcessor::ConvolutionEngine::ConvolutionEngine(int filterLength)
     : m_filterLength(filterLength)
-    , m_historyIndex(0)
-    , m_fftPlan(nullptr)
-    , m_ifftPlan(nullptr) {
+    , m_historyIndex(0) {
     
     // Allocate history buffer for time-domain convolution
     m_historyBuffer.resize(filterLength * 2, 0.0f);
@@ -994,60 +1016,70 @@ void HRTFProcessor::ConvolutionEngine::ProcessFFT(const float* input, float* out
 void HRTFProcessor::ConvolutionEngine::ProcessTimeDomain(const float* input, float* outputLeft,
                                                          float* outputRight, size_t frames,
                                                          const HRTFData::Filter& filter) {
-    // Optimized time-domain convolution with SIMD
-    
+    // Highly optimized time-domain convolution with improved SIMD and memory access
+
+    // Pre-fetch filter data into cache
+    __builtin_prefetch(filter.left.data(), 0, 3);
+    __builtin_prefetch(filter.right.data(), 0, 3);
+
     for (size_t n = 0; n < frames; ++n) {
-        // Add input to circular buffer
-        m_historyBuffer[m_historyIndex] = input[n];
-        m_historyBuffer[m_historyIndex + m_filterLength] = input[n];  // Duplicate for wrap-around
-        
-        // SIMD convolution using AVX2
+        // Add input to circular buffer with optimized indexing
+        const size_t writeIdx = m_historyIndex;
+        m_historyBuffer[writeIdx] = input[n];
+        m_historyBuffer[writeIdx + m_filterLength] = input[n];  // Duplicate for wrap-around
+
+        // SIMD convolution using AVX2 with improved algorithm
         __m256 sumLeft = _mm256_setzero_ps();
         __m256 sumRight = _mm256_setzero_ps();
-        
-        // Process 8 samples at a time
-        int k;
-        for (k = 0; k <= m_filterLength - 8; k += 8) {
-            int histIdx = m_historyIndex + m_filterLength - k;
-            
-            __m256 history = _mm256_loadu_ps(&m_historyBuffer[histIdx - 7]);
-            __m256 filterL = _mm256_loadu_ps(&filter.left[k]);
-            __m256 filterR = _mm256_loadu_ps(&filter.right[k]);
-            
-            // Reverse history for convolution
-            history = _mm256_permute2f128_ps(history, history, 0x01);
-            history = _mm256_shuffle_ps(history, history, 0x1B);
-            
+
+        // Process 8 samples at a time with better memory alignment
+        const float* historyPtr = &m_historyBuffer[writeIdx + 1];
+        const float* leftFilterPtr = filter.left.data();
+        const float* rightFilterPtr = filter.right.data();
+
+        size_t k = 0;
+        const size_t simdEnd = (m_filterLength & ~7);
+
+        for (; k < simdEnd; k += 8) {
+            // Load 8 history samples (reversed order for convolution)
+            __m256 history = _mm256_set_ps(
+                historyPtr[m_filterLength - k - 1],
+                historyPtr[m_filterLength - k - 2],
+                historyPtr[m_filterLength - k - 3],
+                historyPtr[m_filterLength - k - 4],
+                historyPtr[m_filterLength - k - 5],
+                historyPtr[m_filterLength - k - 6],
+                historyPtr[m_filterLength - k - 7],
+                historyPtr[m_filterLength - k - 8]
+            );
+
+            __m256 filterL = _mm256_loadu_ps(&leftFilterPtr[k]);
+            __m256 filterR = _mm256_loadu_ps(&rightFilterPtr[k]);
+
             sumLeft = _mm256_fmadd_ps(history, filterL, sumLeft);
             sumRight = _mm256_fmadd_ps(history, filterR, sumRight);
         }
-        
-        // Horizontal sum
-        __m128 sumLeft128 = _mm_add_ps(_mm256_extractf128_ps(sumLeft, 0),
-                                       _mm256_extractf128_ps(sumLeft, 1));
-        sumLeft128 = _mm_hadd_ps(sumLeft128, sumLeft128);
-        sumLeft128 = _mm_hadd_ps(sumLeft128, sumLeft128);
-        
-        __m128 sumRight128 = _mm_add_ps(_mm256_extractf128_ps(sumRight, 0),
-                                        _mm256_extractf128_ps(sumRight, 1));
-        sumRight128 = _mm_hadd_ps(sumRight128, sumRight128);
-        sumRight128 = _mm_hadd_ps(sumRight128, sumRight128);
-        
-        float leftSum = _mm_cvtss_f32(sumLeft128);
-        float rightSum = _mm_cvtss_f32(sumRight128);
-        
-        // Process remaining samples
+
+        // Horizontal sum with optimized reduction
+        sumLeft = _mm256_hadd_ps(sumLeft, sumRight);
+        sumLeft = _mm256_hadd_ps(sumLeft, sumLeft);
+        __m128 finalSum = _mm_add_ps(_mm256_extractf128_ps(sumLeft, 0), _mm256_extractf128_ps(sumLeft, 1));
+
+        float leftSum = _mm_cvtss_f32(finalSum);
+        float rightSum = _mm_cvtss_f32(_mm_shuffle_ps(finalSum, finalSum, 1));
+
+        // Process remaining samples (scalar fallback)
         for (; k < m_filterLength; ++k) {
-            int histIdx = (m_historyIndex - k + m_filterLength * 2) % m_filterLength;
-            leftSum += m_historyBuffer[histIdx] * filter.left[k];
-            rightSum += m_historyBuffer[histIdx] * filter.right[k];
+            const float histVal = historyPtr[m_filterLength - k - 1];
+            leftSum += histVal * leftFilterPtr[k];
+            rightSum += histVal * rightFilterPtr[k];
         }
-        
+
         outputLeft[n] = leftSum;
         outputRight[n] = rightSum;
-        
-        // Update history index
-        m_historyIndex = (m_historyIndex + 1) % m_filterLength;
+
+        // Update history index with wrap-around
+        m_historyIndex = (m_historyIndex + 1) & (m_filterLength - 1);  // Assumes power-of-2 filter length
     }
 }
 

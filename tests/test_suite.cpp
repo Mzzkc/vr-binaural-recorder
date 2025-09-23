@@ -247,10 +247,10 @@ TEST(RingBufferTest, BasicWriteRead) {
     std::vector<float> writeData(100, 1.0f);
     std::vector<float> readData(100, 0.0f);
     
-    size_t written = buffer.Write(writeData.data(), 100);
+    size_t written = buffer.write(writeData.data(), 100);
     EXPECT_EQ(written, 100);
     
-    size_t read = buffer.Read(readData.data(), 100);
+    size_t read = buffer.read(readData.data(), 100);
     EXPECT_EQ(read, 100);
     
     for (float value : readData) {
@@ -263,7 +263,7 @@ TEST(RingBufferTest, Overflow) {
     
     std::vector<float> data(150, 2.0f);
     
-    size_t written = buffer.Write(data.data(), 150);
+    size_t written = buffer.write(data.data(), 150);
     EXPECT_LE(written, 100);  // Should not write more than capacity
 }
 
@@ -272,7 +272,7 @@ TEST(RingBufferTest, Underflow) {
     
     std::vector<float> readData(50, 0.0f);
     
-    size_t read = buffer.Read(readData.data(), 50);
+    size_t read = buffer.read(readData.data(), 50);
     EXPECT_EQ(read, 0);  // Nothing to read from empty buffer
 }
 
@@ -282,7 +282,7 @@ TEST(RingBufferTest, ConcurrentAccess) {
     
     std::thread writer([&buffer, numSamples]() {
         for (int i = 0; i < numSamples; ++i) {
-            while (buffer.Write(&i, 1) == 0) {
+            while (buffer.write(&i, 1) == 0) {
                 std::this_thread::yield();
             }
         }
@@ -292,7 +292,7 @@ TEST(RingBufferTest, ConcurrentAccess) {
         int expected = 0;
         int value;
         while (expected < numSamples) {
-            if (buffer.Read(&value, 1) == 1) {
+            if (buffer.read(&value, 1) == 1) {
                 EXPECT_EQ(value, expected);
                 expected++;
             } else {
@@ -309,14 +309,14 @@ TEST(RingBufferTest, Reset) {
     RingBuffer<float> buffer(100);
     
     std::vector<float> data(50, 3.0f);
-    buffer.Write(data.data(), 50);
-    
-    EXPECT_EQ(buffer.GetReadAvailable(), 50);
-    
-    buffer.Reset();
-    
-    EXPECT_EQ(buffer.GetReadAvailable(), 0);
-    EXPECT_EQ(buffer.GetWriteAvailable(), 99);  // Capacity - 1
+    buffer.write(data.data(), 50);
+
+    EXPECT_EQ(buffer.available(), 50);
+
+    buffer.reset();
+
+    EXPECT_EQ(buffer.available(), 0);
+    EXPECT_EQ(buffer.free(), buffer.capacity() - 1);  // Capacity - 1
 }
 
 } // namespace vrb
