@@ -382,3 +382,4 @@ TEST_F(ConfigAdvancedTest, AllConfigurationPathsCoverage) {
 }
 
 } // namespace vrb
+}
