@@ -13,7 +13,8 @@
 #include <mutex>
 #include <atomic>
 #include <unordered_map>
-#include "vr_types.h"
+#include "../../core/include/vr_types.h"
+#include "simd/audio_simd.h"
 
 namespace vrb {
 
@@ -387,75 +388,17 @@ namespace AudioUtils {
     void applyWindow(float* buffer, size_t size, WindowType windowType);
 
     /**
-     * @brief SIMD-optimized RMS calculation
+     * @brief SIMD-optimized RMS calculation (delegated to consolidated SIMD module)
      */
     inline float calculateRMS(const float* buffer, size_t size) {
-        if (size == 0) return 0.0f;
-
-#ifdef __AVX2__
-        __m256 sum = _mm256_setzero_ps();
-        const size_t simdSize = size & ~7;
-
-        for (size_t i = 0; i < simdSize; i += 8) {
-            __m256 samples = _mm256_loadu_ps(&buffer[i]);
-            sum = _mm256_fmadd_ps(samples, samples, sum);
-        }
-
-        // Horizontal sum
-        float result[8];
-        _mm256_storeu_ps(result, sum);
-        double totalSum = result[0] + result[1] + result[2] + result[3] +
-                         result[4] + result[5] + result[6] + result[7];
-
-        // Process remaining samples
-        for (size_t i = simdSize; i < size; ++i) {
-            totalSum += buffer[i] * buffer[i];
-        }
-
-        return std::sqrt(totalSum / size);
-#else
-        double sum = 0.0;
-        for (size_t i = 0; i < size; ++i) {
-            sum += buffer[i] * buffer[i];
-        }
-        return std::sqrt(sum / size);
-#endif
+        return simd::calculateRMS(buffer, size);
     }
 
     /**
-     * @brief SIMD-optimized peak calculation
+     * @brief SIMD-optimized peak calculation (delegated to consolidated SIMD module)
      */
     inline float calculatePeak(const float* buffer, size_t size) {
-        if (size == 0) return 0.0f;
-
-#ifdef __AVX2__
-        __m256 maxValues = _mm256_setzero_ps();
-        const size_t simdSize = size & ~7;
-
-        for (size_t i = 0; i < simdSize; i += 8) {
-            __m256 samples = _mm256_loadu_ps(&buffer[i]);
-            __m256 absSamples = _mm256_andnot_ps(_mm256_set1_ps(-0.0f), samples);
-            maxValues = _mm256_max_ps(maxValues, absSamples);
-        }
-
-        // Find maximum in vector
-        float result[8];
-        _mm256_storeu_ps(result, maxValues);
-        float peak = *std::max_element(result, result + 8);
-
-        // Process remaining samples
-        for (size_t i = simdSize; i < size; ++i) {
-            peak = std::max(peak, std::abs(buffer[i]));
-        }
-
-        return peak;
-#else
-        float peak = 0.0f;
-        for (size_t i = 0; i < size; ++i) {
-            peak = std::max(peak, std::abs(buffer[i]));
-        }
-        return peak;
-#endif
+        return simd::calculatePeak(buffer, size);
     }
 
     /**
@@ -464,30 +407,10 @@ namespace AudioUtils {
     void applyGainWithFade(float* buffer, size_t size, float startGain, float endGain);
 
     /**
-     * @brief SIMD-optimized buffer mixing
+     * @brief SIMD-optimized buffer mixing (delegated to consolidated SIMD module)
      */
     inline void mixBuffers(float* destination, const float* source, size_t size, float gain = 1.0f) {
-#ifdef __AVX2__
-        const __m256 gainVector = _mm256_set1_ps(gain);
-        const size_t simdSize = size & ~7;
-
-        for (size_t i = 0; i < simdSize; i += 8) {
-            __m256 dest = _mm256_loadu_ps(&destination[i]);
-            __m256 src = _mm256_loadu_ps(&source[i]);
-            __m256 scaled = _mm256_mul_ps(src, gainVector);
-            __m256 result = _mm256_add_ps(dest, scaled);
-            _mm256_storeu_ps(&destination[i], result);
-        }
-
-        // Process remaining samples
-        for (size_t i = simdSize; i < size; ++i) {
-            destination[i] += source[i] * gain;
-        }
-#else
-        for (size_t i = 0; i < size; ++i) {
-            destination[i] += source[i] * gain;
-        }
-#endif
+        simd::mixBuffers(destination, source, size, gain);
     }
 
     /**
@@ -496,24 +419,10 @@ namespace AudioUtils {
     void clearBuffer(float* buffer, size_t size, bool fadeOut = false);
 
     /**
-     * @brief SIMD-optimized buffer copying
+     * @brief SIMD-optimized buffer copying (delegated to consolidated SIMD module)
      */
     inline void copyBuffer(float* destination, const float* source, size_t size) {
-#ifdef __AVX2__
-        const size_t simdSize = size & ~7;
-
-        for (size_t i = 0; i < simdSize; i += 8) {
-            __m256 data = _mm256_loadu_ps(&source[i]);
-            _mm256_storeu_ps(&destination[i], data);
-        }
-
-        // Copy remaining samples
-        for (size_t i = simdSize; i < size; ++i) {
-            destination[i] = source[i];
-        }
-#else
-        std::memcpy(destination, source, size * sizeof(float));
-#endif
+        simd::copyBuffer(destination, source, size);
     }
 
     /**

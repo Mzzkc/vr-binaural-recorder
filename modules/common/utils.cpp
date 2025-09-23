@@ -69,17 +69,19 @@ void applyWindow(float* buffer, size_t size, WindowType windowType) {
             const float alpha = 0.1f;
             const float fadeLength = alpha * N * 0.5f;
 
-            __m256 window = _mm256_set1_ps(1.0f);
+            // Calculate window values for 8 samples
+            float windowValues[8];
             for (int j = 0; j < 8; ++j) {
                 float n = i + j;
                 if (n < fadeLength) {
-                    float fade = 0.5f * (1.0f + std::cos(MathUtils::PI * (n / fadeLength - 1.0f)));
-                    window[j] = fade;
+                    windowValues[j] = 0.5f * (1.0f + std::cos(MathUtils::PI * (n / fadeLength - 1.0f)));
                 } else if (n > N - fadeLength) {
-                    float fade = 0.5f * (1.0f + std::cos(MathUtils::PI * ((n - N + fadeLength) / fadeLength)));
-                    window[j] = fade;
+                    windowValues[j] = 0.5f * (1.0f + std::cos(MathUtils::PI * ((n - N + fadeLength) / fadeLength)));
+                } else {
+                    windowValues[j] = 1.0f;
                 }
             }
+            window = _mm256_loadu_ps(windowValues);
             break;
         }
         default:
@@ -94,6 +96,7 @@ void applyWindow(float* buffer, size_t size, WindowType windowType) {
     // Process remaining samples
     for (size_t i = simdSize; i < size; ++i) {
 #else
+    }
     for (size_t i = 0; i < size; ++i) {
 #endif
         float window = 1.0f;
@@ -128,31 +131,7 @@ void applyWindow(float* buffer, size_t size, WindowType windowType) {
 }
 
 void applyGainWithFade(float* buffer, size_t size, float startGain, float endGain) {
-    if (!buffer || size == 0) return;
-
-    const float gainDelta = (endGain - startGain) / static_cast<float>(size - 1);
-
-#ifdef __AVX2__
-    const size_t simdSize = size & ~7;
-    const __m256 startGainVec = _mm256_set1_ps(startGain);
-    const __m256 gainDeltaVec = _mm256_set1_ps(gainDelta);
-
-    for (size_t i = 0; i < simdSize; i += 8) {
-        __m256 indices = _mm256_setr_ps(i, i+1, i+2, i+3, i+4, i+5, i+6, i+7);
-        __m256 gains = _mm256_fmadd_ps(indices, gainDeltaVec, startGainVec);
-        __m256 samples = _mm256_loadu_ps(&buffer[i]);
-        __m256 result = _mm256_mul_ps(samples, gains);
-        _mm256_storeu_ps(&buffer[i], result);
-    }
-
-    // Process remaining samples
-    for (size_t i = simdSize; i < size; ++i) {
-#else
-    for (size_t i = 0; i < size; ++i) {
-#endif
-        const float gain = startGain + gainDelta * static_cast<float>(i);
-        buffer[i] *= gain;
-    }
+    simd::applyGainWithFade(buffer, size, startGain, endGain);
 }
 
 void clearBuffer(float* buffer, size_t size, bool fadeOut) {
