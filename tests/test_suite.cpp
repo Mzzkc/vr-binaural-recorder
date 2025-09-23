@@ -260,11 +260,12 @@ TEST(RingBufferTest, BasicWriteRead) {
 
 TEST(RingBufferTest, Overflow) {
     RingBuffer<float> buffer(100);
-    
-    std::vector<float> data(150, 2.0f);
-    
-    size_t written = buffer.write(data.data(), 150);
-    EXPECT_LE(written, 100);  // Should not write more than capacity
+    size_t actualCapacity = buffer.capacity();  // Will be 128 (next power of 2)
+
+    std::vector<float> data(actualCapacity + 50, 2.0f);
+
+    size_t written = buffer.write(data.data(), actualCapacity + 50);
+    EXPECT_LE(written, actualCapacity);  // Should not write more than actual capacity
 }
 
 TEST(RingBufferTest, Underflow) {
@@ -307,7 +308,7 @@ TEST(RingBufferTest, ConcurrentAccess) {
 
 TEST(RingBufferTest, Reset) {
     RingBuffer<float> buffer(100);
-    
+
     std::vector<float> data(50, 3.0f);
     buffer.write(data.data(), 50);
 
@@ -316,7 +317,7 @@ TEST(RingBufferTest, Reset) {
     buffer.reset();
 
     EXPECT_EQ(buffer.available(), 0);
-    EXPECT_EQ(buffer.free(), buffer.capacity() - 1);  // Capacity - 1
+    EXPECT_EQ(buffer.free(), buffer.capacity() - 1);  // Correctly expects capacity - 1
 }
 
 } // namespace vrb
@@ -388,9 +389,12 @@ TEST_F(ConfigTest, DefaultConfig) {
 
 TEST_F(ConfigTest, ConfigReload) {
     Config config(testConfigPath);
-    
+
     EXPECT_EQ(config.GetSampleRate(), 44100);
-    
+
+    // Give watcher thread time to start
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
     // Modify file
     Json::Value root;
     root["audio"]["sampleRate"] = 96000;
@@ -401,16 +405,23 @@ TEST_F(ConfigTest, ConfigReload) {
     root["logging"]["level"] = "info";
     root["logging"]["path"] = "./test_logs";
     root["vr"]["overlayScale"] = 0.5;
-    
+
     std::ofstream file(testConfigPath);
     Json::StreamWriterBuilder builder;
     std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
     writer->write(root, &file);
+    file.flush();
     file.close();
-    
-    // Wait a bit to ensure file timestamp changes
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    
+
+    // Manually trigger file timestamp update to ensure change detection
+    auto now = std::chrono::system_clock::now();
+    auto file_time = std::chrono::time_point_cast<std::filesystem::file_time_type::duration>(
+        now - std::chrono::system_clock::now() + std::filesystem::file_time_type::clock::now());
+    std::filesystem::last_write_time(testConfigPath, file_time);
+
+    // Wait for the watcher thread polling cycle (500ms) plus buffer time
+    std::this_thread::sleep_for(std::chrono::milliseconds(700));
+
     EXPECT_TRUE(config.HasChanged());
     EXPECT_TRUE(config.Reload());
     EXPECT_EQ(config.GetSampleRate(), 96000);

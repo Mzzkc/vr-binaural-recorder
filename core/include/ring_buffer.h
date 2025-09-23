@@ -44,7 +44,7 @@ public:
         const size_t writeIdx = m_writeIndex.load(std::memory_order_relaxed);
         const size_t readIdx = m_readIndex.load(std::memory_order_acquire);
 
-        const size_t available = m_capacity - (writeIdx - readIdx);
+        const size_t available = m_capacity - (writeIdx - readIdx) - 1;  // Reserve one slot
         const size_t toWrite = std::min(count, available);
 
         if (toWrite == 0) {
@@ -179,7 +179,7 @@ public:
     size_t free() const {
         const size_t writeIdx = m_writeIndex.load(std::memory_order_relaxed);
         const size_t readIdx = m_readIndex.load(std::memory_order_acquire);
-        return m_capacity - (writeIdx - readIdx);
+        return m_capacity - (writeIdx - readIdx) - 1;  // Reserve one slot to distinguish full from empty
     }
 
     /**

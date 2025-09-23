@@ -27,9 +27,24 @@ public:
      * @brief Load configuration from JSON file
      * @param filename Path to configuration file
      */
-    explicit Config(const std::string& filename = "config/vr_binaural_config.json");
+    explicit Config(const std::string& filename = "config/vr_binaural_config.json")
+        : m_configPath(filename)
+        , m_lastModified()
+        , m_hasChanges(false) {
 
-    ~Config();
+        Load();
+
+        // Start file watcher thread for hot-reload
+        m_watching = true;
+        m_watcherThread = std::thread([this] { WatchConfigFile(); });
+    }
+
+    ~Config() {
+        m_watching = false;
+        if (m_watcherThread.joinable()) {
+            m_watcherThread.join();
+        }
+    }
 
     // Audio configuration getters
     int GetSampleRate() const { return getInt("audio.sampleRate", 48000); }
@@ -153,30 +168,128 @@ public:
      * @brief Reload configuration from file
      * @return true if reload successful
      */
-    bool Reload();
+    bool Reload() {
+        std::lock_guard<std::mutex> lock(m_mutex);
+        return Load();
+    }
 
     /**
      * @brief Save current configuration to file
      * @return true if save successful
      */
-    bool Save() const;
+    bool Save() const {
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        try {
+            std::ofstream file(m_configPath);
+            if (!file.is_open()) {
+                return false;
+            }
+
+            Json::StreamWriterBuilder builder;
+            builder["indentation"] = "  ";
+            std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+            writer->write(m_root, &file);
+
+            return true;
+        } catch (...) {
+            return false;
+        }
+    }
 
     /**
      * @brief Check if configuration has changed on disk
      * @return true if file has been modified
      */
-    bool HasChanged() const;
+    bool HasChanged() const {
+        return m_hasChanges.load();
+    }
 
     /**
      * @brief Set a configuration value
      */
     template<typename T>
-    void Set(const std::string& path, const T& value);
+    void Set(const std::string& path, const T& value) {
+        std::lock_guard<std::mutex> lock(m_mutex);
+
+        // Parse path
+        std::vector<std::string> keys;
+        std::string key;
+        std::istringstream iss(path);
+        while (std::getline(iss, key, '.')) {
+            keys.push_back(key);
+        }
+
+        // Navigate to value location
+        Json::Value* current = &m_root;
+        for (size_t i = 0; i < keys.size() - 1; ++i) {
+            if (!(*current)[keys[i]].isObject()) {
+                (*current)[keys[i]] = Json::objectValue;
+            }
+            current = &(*current)[keys[i]];
+        }
+
+        // Set value
+        (*current)[keys.back()] = value;
+    }
 
 private:
-    bool Load();
-    void WatchConfigFile();
-    void CreateDefaultConfig();
+    bool Load() {
+        try {
+            if (!std::filesystem::exists(m_configPath)) {
+                // Create default config if not exists
+                CreateDefaultConfig();
+                return Save();
+            }
+
+            std::ifstream file(m_configPath);
+            if (!file.is_open()) {
+                return false;
+            }
+
+            Json::CharReaderBuilder builder;
+            std::string errors;
+            if (!Json::parseFromStream(builder, file, &m_root, &errors)) {
+                std::cerr << "Failed to parse config: " << errors << std::endl;
+                return false;
+            }
+
+            m_lastModified = std::filesystem::last_write_time(m_configPath);
+            m_hasChanges = false;
+            return true;
+
+        } catch (const std::exception& e) {
+            std::cerr << "Error loading config: " << e.what() << std::endl;
+            return false;
+        }
+    }
+
+    void WatchConfigFile() {
+        while (m_watching) {
+            try {
+                if (std::filesystem::exists(m_configPath)) {
+                    auto currentModified = std::filesystem::last_write_time(m_configPath);
+                    if (currentModified != m_lastModified) {
+                        m_lastModified = currentModified;
+                        m_hasChanges = true;
+                    }
+                }
+            } catch (...) {
+                // Ignore errors in watcher thread
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        }
+    }
+
+    void CreateDefaultConfig() {
+        // This would load from the default JSON we saw earlier
+        // For now, create minimal default
+        m_root = Json::objectValue;
+        m_root["audio"]["sampleRate"] = 48000;
+        m_root["audio"]["bufferSize"] = 128;
+        // ... add other defaults
+    }
 
     // Helper methods for safe value access
     int getInt(const std::string& path, int defaultValue) const {

@@ -36,35 +36,44 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(portaudio spdlog jsoncpp)
 
-# Audio engine test sources
+# OpenVR - Use stub headers for development (same as main project)
+set(OPENVR_ROOT_DIR "${CMAKE_SOURCE_DIR}/third_party/openvr_stub")
+set(OPENVR_INCLUDE_DIRS "${OPENVR_ROOT_DIR}/headers")
+set(OPENVR_LIBRARIES "")
+
+# Audio engine test sources - FIXED PATHS for modular architecture!
 set(AUDIO_TEST_SOURCES
     test_audio_engine.cpp
-    ${CMAKE_SOURCE_DIR}/core/src/audio_engine.cpp
-    ${CMAKE_SOURCE_DIR}/core/src/hrtf_processor.cpp
-    ${CMAKE_SOURCE_DIR}/utils/src/logger.cpp
+    ${CMAKE_SOURCE_DIR}/modules/audio/audio_engine.cpp
+    ${CMAKE_SOURCE_DIR}/modules/audio/hrtf_processor.cpp
+    ${CMAKE_SOURCE_DIR}/core/src/logger.cpp
+    ${CMAKE_SOURCE_DIR}/core/src/config.cpp
 )
 
-# VR tracker test sources
+# VR tracker test sources - FIXED PATHS for modular architecture!
 set(VR_TEST_SOURCES
     test_vr_tracker.cpp
-    ${CMAKE_SOURCE_DIR}/vr/src/vr_tracker.cpp
-    ${CMAKE_SOURCE_DIR}/utils/src/logger.cpp
+    ${CMAKE_SOURCE_DIR}/modules/vr/vr_tracker.cpp
+    ${CMAKE_SOURCE_DIR}/core/src/logger.cpp
 )
 
 # Build test executables
 add_executable(test_audio_engine ${AUDIO_TEST_SOURCES})
 add_executable(test_vr_tracker ${VR_TEST_SOURCES})
 
-# Include directories for tests
+# Include directories for tests - FIXED for modular architecture!
 target_include_directories(test_audio_engine PRIVATE
     ${CMAKE_SOURCE_DIR}/core/include
-    ${CMAKE_SOURCE_DIR}/utils/include
+    ${CMAKE_SOURCE_DIR}/modules/audio
+    ${CMAKE_SOURCE_DIR}/modules/common
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
 target_include_directories(test_vr_tracker PRIVATE
-    ${CMAKE_SOURCE_DIR}/vr/include
-    ${CMAKE_SOURCE_DIR}/utils/include
+    ${CMAKE_SOURCE_DIR}/core/include
+    ${CMAKE_SOURCE_DIR}/modules/vr
+    ${CMAKE_SOURCE_DIR}/modules/common
+    ${OPENVR_INCLUDE_DIRS}
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -76,12 +85,12 @@ target_link_libraries(test_audio_engine PRIVATE
     jsoncpp_lib
 )
 
-# Link libraries for VR test
+# Link libraries for VR test - FIXED OpenVR reference!
 target_link_libraries(test_vr_tracker PRIVATE
     Threads::Threads
     spdlog::spdlog
     jsoncpp_lib
-    ${OpenVR_LIBRARIES}
+    ${OPENVR_LIBRARIES}
 )
 
 # Platform-specific libraries

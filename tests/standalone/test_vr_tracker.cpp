@@ -14,7 +14,7 @@ int main() {
     std::cout << "======================================\n\n";
 
     // Initialize logger
-    vrb::InitializeLogger();
+    Logger::Initialize("debug", "./logs", true);
 
     // Create VR tracker instance
     VRTracker tracker;
@@ -108,5 +108,6 @@ int main() {
     std::cout << "Total pose updates received: " << poseUpdateCount << "\n";
     std::cout << "This demonstrates our VR tracking system is working correctly!\n";
 
+    Logger::Shutdown();
     return 0;
 }

@@ -294,11 +294,32 @@ private:
      */
     void AdjustBufferSize();
 
+    /**
+     * @brief Detect if running in headless/WSL2 environment
+     */
+    bool IsHeadlessEnvironment() const;
+
+    /**
+     * @brief Initialize mock audio backend for testing environments
+     */
+    bool InitializeMockBackend();
+
+    /**
+     * @brief Check if mock backend is active
+     */
+    bool IsMockBackend() const { return m_mockBackend; }
+
+    /**
+     * @brief Mock processing thread loop
+     */
+    void MockProcessingLoop();
+
     // State
     std::atomic<bool> m_initialized{false};
     std::atomic<bool> m_running{false};
     std::atomic<bool> m_exclusiveMode{false};
     std::atomic<bool> m_adaptiveBuffering{false};
+    std::atomic<bool> m_mockBackend{false};
 
     // Audio configuration
     int m_sampleRate;
@@ -372,6 +393,13 @@ private:
     std::condition_variable m_streamCondition;
     std::thread m_monitorThread;
     std::atomic<bool> m_monitorRunning{false};
+
+    // Mock backend state
+    std::vector<DeviceInfo> m_mockInputDevices;
+    std::vector<DeviceInfo> m_mockOutputDevices;
+    std::thread m_mockProcessingThread;
+    std::atomic<bool> m_mockProcessingRunning{false};
+    std::chrono::steady_clock::time_point m_mockLastProcessTime;
 };
 
 } // namespace vrb
