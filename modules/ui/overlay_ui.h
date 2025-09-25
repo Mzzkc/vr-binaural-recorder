@@ -20,10 +20,13 @@
 namespace vrb {
 
 /**
- * @brief VR Overlay UI for real-time control and monitoring
+ * @brief VR Audio Routing Overlay UI - Legacy ImGui Interface
  *
- * Provides an ImGui-based interface rendered as a VR overlay
- * for adjusting parameters and monitoring system status.
+ * DEPRECATED: This is the old ImGui-based interface for audio routing.
+ * For the NEW creative holographic interface, use AudioRoutingOverlay instead!
+ *
+ * This class provides a simple ImGui panel for basic audio routing controls
+ * when the fancy 3D interface isn't needed or VR isn't available.
  */
 class OverlayUI {
 public:

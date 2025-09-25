@@ -79,6 +79,9 @@ set(OPENVR_INCLUDE_DIRS "${OPENVR_ROOT_DIR}/headers")
 # Using stub implementation - no libraries needed for compilation
 set(OPENVR_LIBRARIES "")
 
+# Define stub build flag for conditional compilation
+add_compile_definitions(OPENVR_STUB_BUILD)
+
 # ImGui with OpenGL backend
 FetchContent_Declare(
     imgui
@@ -138,6 +141,9 @@ set(VR_SOURCES
 
 set(UI_SOURCES
     modules/ui/overlay_ui.cpp
+    # 🎧 CREATIVE CODER'S AUDIO COCKPIT - NOW ENABLED! 🎧
+    modules/ui/audio_routing_overlay.cpp
+    modules/ui/audio_routing_integration.cpp
 )
 
 set(COMMON_SOURCES
@@ -179,6 +185,8 @@ set(VR_HEADERS
 
 set(UI_HEADERS
     modules/ui/overlay_ui.h
+    # 🎧 CREATIVE CODER'S AUDIO COCKPIT HEADER - NOW ENABLED! 🎧
+    modules/ui/audio_routing_overlay.h
 )
 
 set(COMMON_HEADERS
@@ -330,6 +338,8 @@ add_executable(vr_binaural_tests
     modules/audio/hrtf_processor.cpp
     modules/vr/vr_tracker.cpp
     modules/ui/overlay_ui.cpp
+    modules/ui/audio_routing_overlay.cpp
+    modules/ui/audio_routing_integration.cpp
     modules/common/utils.cpp
     ${IMGUI_SOURCES}
 )

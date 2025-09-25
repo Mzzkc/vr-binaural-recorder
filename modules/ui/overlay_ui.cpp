@@ -461,7 +461,7 @@ void OverlayUI::UpdateOverlayTransform() {
     if (m_overlayFollowHead) {
         // Follow head position but stay in front
         if (m_vrTracker) {
-            VRPose headPose = m_vrTracker->GetHeadPose();
+            VRPose headPose = m_vrTracker->GetHMDPose();
             if (headPose.isValid) {
                 // Calculate position 2m in front of head
                 vr::HmdMatrix34_t transform;
@@ -726,7 +726,8 @@ void OverlayUI::UpdateMicrophonePositions() {
     if (m_leftControllerGrabbing || m_rightControllerGrabbing) {
         // Calculate stereo pair configuration
         Vec3 centerPos = (m_microphonePositions[0] + m_microphonePositions[1]) * 0.5f;
-        m_vrTracker->SetMicrophonePosition(centerPos);
+        // TODO: Add SetMicrophonePosition method to VRTracker if needed
+        // For now, spatial positioning is handled through the tracking callback
 
         // Update audio engine with microphone configuration
         if (m_audioEngine) {
@@ -774,11 +775,11 @@ void OverlayUI::ToggleRecording() {
 
     if (m_audioEngine) {
         if (m_isRecording) {
-            m_audioEngine->StartRecording();
-            LOG_INFO("Recording started from VR overlay!");
+            m_audioEngine->Start();
+            LOG_INFO("Audio processing started from VR overlay!");
         } else {
-            m_audioEngine->StopRecording();
-            LOG_INFO("Recording stopped from VR overlay!");
+            m_audioEngine->Stop();
+            LOG_INFO("Audio processing stopped from VR overlay!");
         }
     }
 }
@@ -789,11 +790,13 @@ void OverlayUI::TogglePause() {
 
     if (m_audioEngine) {
         if (m_isPaused) {
-            m_audioEngine->Pause();
-            LOG_INFO("Recording paused from VR overlay");
+            // For simplicity, stopping represents pausing
+            m_audioEngine->Stop();
+            LOG_INFO("Audio processing paused from VR overlay");
         } else {
-            m_audioEngine->Resume();
-            LOG_INFO("Recording resumed from VR overlay");
+            // Resuming means starting again
+            m_audioEngine->Start();
+            LOG_INFO("Audio processing resumed from VR overlay");
         }
     }
 }
