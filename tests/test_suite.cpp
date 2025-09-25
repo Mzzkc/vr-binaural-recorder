@@ -175,8 +175,9 @@ TEST_F(HRTFProcessorTest, SpatialPositionUpdate) {
     VRPose micPose;
     micPose.position = {0.0f, 1.2f, -1.0f};
     micPose.orientation = {0.0f, 0.0f, 0.0f, 1.0f};
-    
-    processor->UpdateSpatialPosition(headPose, micPose);
+    std::vector<VRPose> controllers = {micPose}; // Wrap mic in vector for API compatibility
+
+    processor->UpdateSpatialPosition(headPose, controllers);
     
     auto stats = processor->GetStats();
     EXPECT_NE(stats.distance, 0.0f);
@@ -206,15 +207,16 @@ TEST_F(HRTFProcessorTest, DistanceAttenuation) {
     headNear.position = {0.0f, 1.2f, -0.5f};
     VRPose mic;
     mic.position = {0.0f, 1.2f, -1.0f};
-    
-    processor->UpdateSpatialPosition(headNear, mic);
+    std::vector<VRPose> controllers = {mic}; // Wrap mic in vector for API compatibility
+
+    processor->UpdateSpatialPosition(headNear, controllers);
     processor->Process(input.data(), outputNear.data(), frames, 1);
-    
+
     // Process with far position
     VRPose headFar;
     headFar.position = {0.0f, 1.2f, -5.0f};
-    
-    processor->UpdateSpatialPosition(headFar, mic);
+
+    processor->UpdateSpatialPosition(headFar, controllers);
     processor->Process(input.data(), outputFar.data(), frames, 1);
     
     // Calculate RMS
