@@ -21,20 +21,20 @@ int main() {
 
     // Set up tracking callback to monitor head movement
     int poseUpdateCount = 0;
-    tracker.SetTrackingCallback([&poseUpdateCount](const VRPose& head, const VRPose& mic) {
+    tracker.SetTrackingCallback([&poseUpdateCount](const VRPose& head, const std::vector<VRPose>& controllers) {
         poseUpdateCount++;
 
         if (poseUpdateCount % 90 == 0) { // Log every ~1 second at 90Hz
             std::cout << "Head pose update #" << poseUpdateCount << ":\n";
             std::cout << "  Position: (" << head.position.x << ", "
                      << head.position.y << ", " << head.position.z << ")\n";
+            std::cout << "  Controllers: " << controllers.size() << "\n";
             std::cout << "  Orientation: (" << head.orientation.x << ", "
                      << head.orientation.y << ", " << head.orientation.z
                      << ", " << head.orientation.w << ")\n";
             std::cout << "  Valid: " << (head.isValid ? "Yes" : "No") << "\n";
 
-            std::cout << "Microphone position: (" << mic.position.x << ", "
-                     << mic.position.y << ", " << mic.position.z << ")\n\n";
+            // Note: Using simplified VR tracker for spatial audio only\n";
         }
     });
 
@@ -63,42 +63,31 @@ int main() {
         tracker.ProcessEvents();
 
         // Get current poses manually
-        VRPose headPose = tracker.GetHeadPose();
-        VRPose micPose = tracker.GetMicrophonePose();
+        VRPose headPose = tracker.GetHMDPose();
+        // Note: Using simplified tracker - microphone position is relative to HMD
 
         std::cout << "Current head position: (" << headPose.position.x << ", "
                  << headPose.position.y << ", " << headPose.position.z << ")\n";
     }
 
-    // Test microphone position manipulation
-    std::cout << "\nTesting microphone position control...\n";
-
-    Vec3 testPositions[] = {
-        {1.0f, 1.5f, 0.0f},   // Right side
-        {-1.0f, 1.5f, 0.0f},  // Left side
-        {0.0f, 2.0f, -0.5f},  // Above and forward
-        {0.0f, 0.5f, -2.0f}   // Low and far forward
-    };
+    // Test controller tracking (simplified API)
+    std::cout << "\nTesting controller tracking...\n";
 
     for (int i = 0; i < 4; ++i) {
-        tracker.SetMicrophonePosition(testPositions[i]);
+        auto controllers = tracker.GetControllerPoses();
+        std::cout << "Controller count: " << controllers.size() << "\n";
 
-        VRPose micPose = tracker.GetMicrophonePose();
-        std::cout << "Set microphone to: (" << testPositions[i].x << ", "
-                 << testPositions[i].y << ", " << testPositions[i].z
-                 << ") -> Got: (" << micPose.position.x << ", "
-                 << micPose.position.y << ", " << micPose.position.z << ")\n";
+        for (size_t j = 0; j < controllers.size(); ++j) {
+            const auto& controller = controllers[j];
+            std::cout << "Controller " << j << ": (" << controller.position.x << ", "
+                     << controller.position.y << ", " << controller.position.z
+                     << ") Valid: " << (controller.isValid ? "Yes" : "No") << "\n";
+        }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
     }
 
-    // Reset to default
-    std::cout << "\nResetting microphone to default position...\n";
-    tracker.ResetMicrophonePosition();
-
-    VRPose finalMicPose = tracker.GetMicrophonePose();
-    std::cout << "Final microphone position: (" << finalMicPose.position.x << ", "
-             << finalMicPose.position.y << ", " << finalMicPose.position.z << ")\n";
+    std::cout << "\nSimplified VR tracker test complete - using HMD-relative audio positioning\n";
 
     // Stop tracking
     std::cout << "\nStopping VR tracking...\n";

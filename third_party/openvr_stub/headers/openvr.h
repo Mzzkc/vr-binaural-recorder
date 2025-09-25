@@ -13,6 +13,7 @@ typedef uint64_t VROverlayHandle_t;
 
 static const TrackedDeviceIndex_t k_unTrackedDeviceIndex_Hmd = 0;
 static const TrackedDeviceIndex_t k_unMaxTrackedDeviceCount = 64;
+static const TrackedDeviceIndex_t k_unTrackedDeviceIndexInvalid = 0xFFFFFFFF;
 static const VROverlayHandle_t k_ulOverlayHandleInvalid = 0;
 
 // Basic enums
@@ -192,6 +193,12 @@ enum ETrackedDeviceClass {
     TrackedDeviceClass_TrackingReference = 4,
     TrackedDeviceClass_DisplayRedirect = 5,
     TrackedDeviceClass_Max
+};
+
+enum ETrackedControllerRole {
+    TrackedControllerRole_Invalid = 0,
+    TrackedControllerRole_LeftHand = 1,
+    TrackedControllerRole_RightHand = 2
 };
 
 enum ETrackedDeviceProperty {
@@ -665,7 +672,36 @@ enum EVROverlayInputMethod {
     VROverlayInputMethod_Mouse = 1
 };
 
-// Forward declarations and enums that are needed early
+// Overlay flags enum - commonly used overlay configuration flags
+enum EVROverlayFlags {
+    VROverlayFlags_NoDashboardTab = 8,
+    VROverlayFlags_SendVRDiscreteScrollEvents = 64,
+    VROverlayFlags_SendVRTouchpadEvents = 128,
+    VROverlayFlags_ShowTouchPadScrollWheel = 256,
+    VROverlayFlags_TransferOwnershipToInternalProcess = 512,
+    VROverlayFlags_SideBySide_Parallel = 1024,
+    VROverlayFlags_SideBySide_Crossed = 2048,
+    VROverlayFlags_Panorama = 4096,
+    VROverlayFlags_StereoPanorama = 8192,
+    VROverlayFlags_SortWithNonSceneOverlays = 16384,
+    VROverlayFlags_VisibleInDashboard = 32768,
+    VROverlayFlags_MakeOverlaysInteractiveIfVisible = 65536,
+    VROverlayFlags_SendVRSmoothScrollEvents = 131072,
+    VROverlayFlags_ProtectedContent = 262144,
+    VROverlayFlags_HideLaserIntersection = 524288,
+    VROverlayFlags_WantsModalBehavior = 1048576,
+    VROverlayFlags_IsPremultiplied = 2097152
+};
+
+// VR Controller State structure - basic controller input data
+struct VRControllerState_t {
+    uint32_t unPacketNum;
+    uint64_t ulButtonPressed;
+    uint64_t ulButtonTouched;
+    float rAxis[5][2];
+};
+
+// Tracking result enum - needed before TrackedDevicePose_t
 enum ETrackingResult {
     TrackingResult_Uninitialized = 1,
     TrackingResult_Calibrating_InProgress = 100,
@@ -674,6 +710,26 @@ enum ETrackingResult {
     TrackingResult_Running_OutOfRange = 201,
     TrackingResult_Fallback_RotationOnly = 300
 };
+
+// Matrix structures for tracking poses
+struct HmdMatrix34_t {
+    float m[3][4];
+};
+
+struct HmdVector3_t {
+    float v[3];
+};
+
+struct TrackedDevicePose_t {
+    HmdMatrix34_t mDeviceToAbsoluteTracking;
+    HmdVector3_t vVelocity;
+    HmdVector3_t vAngularVelocity;
+    ETrackingResult eTrackingResult;
+    bool bPoseIsValid;
+    bool bDeviceIsConnected;
+};
+
+// Forward declarations and enums that are needed early
 
 enum ETrackedPropertyError {
     TrackedProp_Success = 0,
@@ -695,22 +751,6 @@ enum ETrackedPropertyError {
 };
 
 // Basic structures
-struct HmdMatrix34_t {
-    float m[3][4];
-};
-
-struct HmdVector3_t {
-    float v[3];
-};
-
-struct TrackedDevicePose_t {
-    HmdMatrix34_t mDeviceToAbsoluteTracking;
-    HmdVector3_t vVelocity;
-    HmdVector3_t vAngularVelocity;
-    ETrackingResult eTrackingResult;
-    bool bPoseIsValid;
-    bool bDeviceIsConnected;
-};
 
 typedef TrackedDevicePose_t TrackedDevicePoses_t;
 
@@ -743,6 +783,9 @@ public:
     virtual bool PollNextEvent(VREvent_t* pEvent, uint32_t uncbVREvent) = 0;
     virtual float GetFloatTrackedDeviceProperty(TrackedDeviceIndex_t unDeviceIndex, ETrackedDeviceProperty prop, ETrackedPropertyError* pError = nullptr) = 0;
     virtual uint32_t GetStringTrackedDeviceProperty(TrackedDeviceIndex_t unDeviceIndex, ETrackedDeviceProperty prop, char* pchValue, uint32_t unBufferSize, ETrackedPropertyError* pError = nullptr) = 0;
+    virtual void GetDeviceToAbsoluteTrackingPose(ETrackingUniverseOrigin eOrigin, float fPredictedSecondsToPhotonsFromNow, TrackedDevicePose_t* pTrackedDevicePoseArray, uint32_t unTrackedDevicePoseArrayCount) = 0;
+    virtual bool GetControllerStateWithPose(ETrackingUniverseOrigin eOrigin, TrackedDeviceIndex_t unControllerDeviceIndex, VRControllerState_t* pControllerState, uint32_t unControllerStateSize, TrackedDevicePose_t* pTrackedDevicePose) = 0;
+    virtual ETrackedControllerRole GetControllerRoleForTrackedDeviceIndex(TrackedDeviceIndex_t unDeviceIndex) = 0;
 };
 
 class IVRCompositor {
@@ -763,6 +806,7 @@ public:
     virtual EVROverlayError ShowOverlay(VROverlayHandle_t ulOverlayHandle) = 0;
     virtual EVROverlayError HideOverlay(VROverlayHandle_t ulOverlayHandle) = 0;
     virtual EVROverlayError SetOverlayTexture(VROverlayHandle_t ulOverlayHandle, const Texture_t* pTexture) = 0;
+    virtual EVROverlayError SetOverlayFlag(VROverlayHandle_t ulOverlayHandle, EVROverlayFlags eOverlayFlag, bool bEnabled) = 0;
     virtual bool PollNextOverlayEvent(VROverlayHandle_t ulOverlayHandle, VREvent_t* pEvent, uint32_t uncbVREvent) = 0;
     virtual const char* GetOverlayErrorNameFromEnum(EVROverlayError error) = 0;
 };
@@ -780,5 +824,6 @@ inline const char* VR_GetVRInitErrorAsEnglishDescription(EVRInitError eError) {
 }
 inline IVRCompositor* VRCompositor() { return nullptr; }
 inline IVROverlay* VROverlay() { return nullptr; }
+inline IVRSystem* VRSystem() { return nullptr; }
 
 } // namespace vr

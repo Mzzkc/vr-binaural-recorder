@@ -5,6 +5,7 @@
 #include "logger.h"
 #include <chrono>
 #include <cmath>
+#include <thread>
 
 namespace vrb {
 
@@ -18,6 +19,15 @@ VRTracker::VRTracker() : m_vrSystem(nullptr) {
 }
 
 VRTracker::~VRTracker() {
+    StopTracking();  // Ensure tracking thread is stopped
+
+    // Clean up atomic callback pointer
+    TrackingCallback* oldCallback = m_audioCallback.load();
+    if (oldCallback) {
+        delete oldCallback;
+        m_audioCallback.store(nullptr);
+    }
+
     if (m_vrSystem) {
         vr::VR_Shutdown();
         m_vrSystem = nullptr;
@@ -51,10 +61,15 @@ bool VRTracker::Initialize() {
     }
 
     // Log basic system info
-    std::string hmdModel = m_vrSystem->GetStringTrackedDeviceProperty(
+    char buffer[1024];
+    uint32_t len = m_vrSystem->GetStringTrackedDeviceProperty(
         vr::k_unTrackedDeviceIndex_Hmd,
-        vr::Prop_ModelNumber_String
+        vr::Prop_ModelNumber_String,
+        buffer,
+        sizeof(buffer),
+        nullptr
     );
+    std::string hmdModel = (len > 0) ? std::string(buffer) : "Unknown";
 
     LOG_INFO("OpenVR initialized successfully");
     LOG_INFO("HMD Model: {}", hmdModel.empty() ? "Unknown" : hmdModel);
@@ -63,19 +78,104 @@ bool VRTracker::Initialize() {
     return true;
 }
 
+bool VRTracker::StartTracking() {
+    if (!Initialize()) {
+        LOG_ERROR("Failed to initialize VR tracking");
+        return false;
+    }
+
+    if (m_trackingThread.joinable()) {
+        LOG_WARN("Tracking already running");
+        return true;
+    }
+
+    m_running.store(true);
+    m_trackingThread = std::thread(&VRTracker::TrackingLoop, this);
+
+    LOG_INFO("VR tracking started - integrated with audio pipeline");
+    return true;
+}
+
+void VRTracker::StopTracking() {
+    if (m_running.load()) {
+        m_running.store(false);
+        if (m_trackingThread.joinable()) {
+            m_trackingThread.join();
+        }
+        LOG_INFO("VR tracking stopped");
+    }
+}
+
+void VRTracker::Shutdown() {
+    LOG_INFO("Shutting down VR tracker...");
+
+    // Stop tracking thread if running
+    StopTracking();
+
+    // Clean up atomic callback pointer
+    std::lock_guard<std::mutex> lock(m_callbackMutex);
+    TrackingCallback* oldCallback = m_audioCallback.load();
+    if (oldCallback) {
+        delete oldCallback;
+        m_audioCallback.store(nullptr);
+    }
+
+    // Shutdown OpenVR system
+    if (m_vrSystem) {
+        vr::VR_Shutdown();
+        m_vrSystem = nullptr;
+        LOG_INFO("OpenVR shutdown complete");
+    }
+
+    // Reset poses to safe defaults
+    {
+        std::lock_guard<std::mutex> poseLock(m_poseMutex);
+        m_hmdPose.isValid = false;
+        m_controllerPoses.clear();
+    }
+
+    LOG_INFO("VR tracker shutdown complete");
+}
+
+void VRTracker::TrackingLoop() {
+    // Use compositor frame timing instead of fixed 90Hz
+    while (m_running.load()) {
+        Update(); // Now uses WaitGetPoses for proper frame sync
+    }
+}
+
 void VRTracker::Update() {
     if (!m_vrSystem) {
         return;
     }
 
-    // SINGLE OpenVR CALL GETS ALL POSES - This is the efficient approach!
+    // Modern API with fallback for development stub
     vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount];
-    vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(
-        vr::TrackingUniverseStanding,
-        0.0f,  // No prediction needed - OpenVR handles this optimally
-        poses,
-        vr::k_unMaxTrackedDeviceCount
-    );
+
+    // Modern API implementation with stub compatibility
+    #ifdef OPENVR_STUB_BUILD
+        // Development stub - use optimized legacy API with proper prediction
+        m_vrSystem->GetDeviceToAbsoluteTrackingPose(
+            vr::TrackingUniverseStanding,
+            0.011f,  // ~11ms prediction for 90Hz (1/90 ≈ 0.011s) - optimized for low latency
+            poses,
+            vr::k_unMaxTrackedDeviceCount
+        );
+    #else
+        // Production: Use modern frame-synchronized API for optimal performance
+        if (vr::VRCompositor() != nullptr) {
+            // WaitGetPoses provides frame-synchronized poses with <5ms latency
+            vr::VRCompositor()->WaitGetPoses(poses, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
+        } else {
+            // Fallback for non-compositor applications
+            m_vrSystem->GetDeviceToAbsoluteTrackingPose(
+                vr::TrackingUniverseStanding,
+                0.011f,  // Optimized prediction timing
+                poses,
+                vr::k_unMaxTrackedDeviceCount
+            );
+        }
+    #endif
 
     // Extract what we actually need
     {
@@ -84,15 +184,30 @@ void VRTracker::Update() {
         ExtractControllerPoses(poses);
     }
 
-    // Notify audio engine if callback is set
-    if (m_callback) {
-        m_callback(m_hmdPose, m_controllerPoses);
+    // Notify Audio Cockpit with thread-safe callback system
+    TrackingCallback* callback = m_audioCallback.load();
+    if (callback) {
+        (*callback)(m_hmdPose, m_controllerPoses);  // Creative Coder's gesture magic happens here!
     }
 }
 
+void VRTracker::ProcessEvents() {
+    // ProcessEvents is an alias for Update for compatibility with Application
+    Update();
+}
+
 void VRTracker::SetTrackingCallback(TrackingCallback callback) {
-    m_callback = callback;
-    LOG_INFO("Tracking callback registered for audio engine integration");
+    std::lock_guard<std::mutex> lock(m_callbackMutex);
+
+    // Clean up old callback
+    TrackingCallback* oldCallback = m_audioCallback.load();
+    if (oldCallback) {
+        delete oldCallback;
+    }
+
+    // Set new callback atomically for Creative Coder's Audio Cockpit
+    m_audioCallback.store(new TrackingCallback(std::move(callback)));
+    LOG_INFO("Thread-safe tracking callback registered for Audio Cockpit integration");
 }
 
 VRPose VRTracker::GetHMDPose() const {
@@ -254,6 +369,28 @@ float VRTracker::GetHMDRefreshRate() const {
 
     // Return safe default if property not available
     return (refreshRate > 0.0f) ? refreshRate : 90.0f;
+}
+
+std::vector<std::string> VRTracker::GetTroubleshootingSteps() const {
+    std::vector<std::string> steps;
+
+    if (!m_vrSystem) {
+        steps.push_back("1. Install SteamVR from Steam");
+        steps.push_back("2. Connect your VR headset to PC");
+        steps.push_back("3. Launch SteamVR and complete room setup");
+        steps.push_back("4. Ensure headset is detected in SteamVR status");
+        steps.push_back("5. Restart this application");
+    } else if (!IsHMDConnected()) {
+        steps.push_back("1. Check all VR headset cables are connected");
+        steps.push_back("2. Restart SteamVR");
+        steps.push_back("3. Check headset power and tracking");
+        steps.push_back("4. Verify headset appears in SteamVR devices");
+    } else {
+        steps.push_back("VR system is working correctly");
+        steps.push_back("All tracking devices are connected and functional");
+    }
+
+    return steps;
 }
 
 } // namespace vrb

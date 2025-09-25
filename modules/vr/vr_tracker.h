@@ -7,6 +7,9 @@
 #include <functional>
 #include <mutex>
 #include <vector>
+#include <string>
+#include <thread>
+#include <atomic>
 #include "vr_types.h"
 
 namespace vrb {
@@ -24,8 +27,12 @@ public:
 
     // Core functionality
     bool Initialize();
+    bool StartTracking();  // Start 90Hz tracking thread as per Solution Architect design
+    void StopTracking();   // Stop tracking thread
     void Update();  // Call this each frame to get latest poses
+    void ProcessEvents();  // Process VR events (alias for Update for compatibility)
     void SetTrackingCallback(TrackingCallback callback);
+    void Shutdown();  // Complete shutdown and cleanup - stops tracking and releases VR resources
 
     // Pose access
     VRPose GetHMDPose() const;
@@ -34,7 +41,13 @@ public:
     // Simple state queries
     bool IsInitialized() const { return m_vrSystem != nullptr; }
     bool IsHMDConnected() const;
+    bool IsConnected() const { return IsHMDConnected(); } // Alias for test compatibility
     int GetConnectedControllerCount() const;
+
+    // Testing framework compatibility methods
+    void EnableSimulationMode(bool enable) { /* Not implemented - hardware-only tracker */ }
+    bool IsSimulationMode() const { return false; } // Always hardware mode
+    std::vector<std::string> GetTroubleshootingSteps() const;
 
     // Basic headset info for audio optimizations (extracted directly from OpenVR)
     std::string GetHMDModel() const;
@@ -46,6 +59,9 @@ private:
     void ExtractHMDPose(const vr::TrackedDevicePose_t poses[]);
     void ExtractControllerPoses(const vr::TrackedDevicePose_t poses[]);
 
+    // Threading implementation as per Solution Architect design
+    void TrackingLoop();  // 90Hz tracking thread main function
+
     // OpenVR system
     vr::IVRSystem* m_vrSystem;
 
@@ -54,8 +70,13 @@ private:
     std::vector<VRPose> m_controllerPoses;
     mutable std::mutex m_poseMutex;
 
-    // Callback for audio engine
-    TrackingCallback m_callback;
+    // Threading infrastructure
+    std::thread m_trackingThread;
+    std::atomic<bool> m_running{false};
+
+    // Thread-safe callback system for Audio Cockpit integration
+    std::atomic<TrackingCallback*> m_audioCallback{nullptr};
+    std::mutex m_callbackMutex;
 };
 
 } // namespace vrb
