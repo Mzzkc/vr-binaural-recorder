@@ -454,6 +454,80 @@ void AudioEngine::Stop() {
              stats.peakInputLevel, stats.peakOutputLevel, stats.droppedSamples);
 }
 
+void AudioEngine::Update() {
+    if (!m_initialized) {
+        return;
+    }
+
+    // Update performance monitoring
+    MonitorPerformance();
+
+    // Handle adaptive buffer adjustment if enabled
+    if (m_adaptiveBuffering) {
+        AdjustBufferSize();
+    }
+
+    // Update audio level monitoring for VR overlay
+    // Decay peak levels gradually for smooth VR meter visualization
+    float currentInputLevel = m_peakInputLevel.load();
+    float currentOutputLeft = m_outputLevelLeft.load();
+    float currentOutputRight = m_outputLevelRight.load();
+
+    m_peakInputLevel.store(currentInputLevel * PEAK_DECAY_RATE);
+    m_outputLevelLeft.store(currentOutputLeft * PEAK_DECAY_RATE);
+    m_outputLevelRight.store(currentOutputRight * PEAK_DECAY_RATE);
+}
+
+void AudioEngine::Shutdown() {
+    LOG_INFO("Shutting down audio engine...");
+
+    // Stop any running audio processing first
+    if (m_running) {
+        Stop();
+    }
+
+    // Stop monitor thread
+    if (m_monitorRunning) {
+        m_monitorRunning = false;
+        if (m_monitorThread.joinable()) {
+            m_monitorThread.join();
+        }
+    }
+
+    // Clean up virtual audio device
+    if (m_virtualDeviceCreated) {
+        if (!RemoveVirtualAudioDevice()) {
+            LOG_WARN("Failed to remove virtual audio device during shutdown");
+        }
+    }
+
+    // Release platform-specific resources
+#ifdef _WIN32
+    if (m_avrtHandle != nullptr) {
+        AvRevertMmThreadCharacteristics(m_avrtHandle);
+        m_avrtHandle = nullptr;
+    }
+#elif defined(__linux__)
+    if (m_pulseModulePid > 0) {
+        // Clean up PulseAudio module if created
+        std::string cmd = "pactl unload-module " + std::to_string(m_pulseModulePid);
+        system(cmd.c_str());
+        m_pulseModulePid = -1;
+    }
+#endif
+
+    // Reset all state
+    m_initialized = false;
+    m_hrtf = nullptr;
+
+    // Clear buffers
+    m_inputBuffer.reset();
+    m_outputBuffer.reset();
+    m_processingBuffer.reset();
+
+    LOG_INFO("Audio engine shutdown complete");
+}
+
 std::vector<AudioEngine::DeviceInfo> AudioEngine::GetInputDevices() const {
     std::vector<DeviceInfo> devices;
 

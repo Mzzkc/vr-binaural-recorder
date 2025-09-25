@@ -115,9 +115,21 @@ public:
     bool Start();
 
     /**
+     * @brief Update audio engine state and processing
+     * Called each frame for audio system updates
+     */
+    void Update();
+
+    /**
      * @brief Stop audio processing
      */
     void Stop();
+
+    /**
+     * @brief Shutdown audio engine and cleanup resources
+     * Stops processing and releases all audio resources
+     */
+    void Shutdown();
 
     /**
      * @brief Get list of available input devices

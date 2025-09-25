@@ -12,7 +12,7 @@
 #include "audio_engine.h"
 #include "vr_tracker.h"
 #include "hrtf_processor.h"
-#include "overlay_ui.h"
+#include "audio_routing_overlay.h"  // NEW: Revolutionary Audio Cockpit interface!
 #include "utils.h"
 
 namespace vrb {
@@ -119,8 +119,6 @@ private:
     InitResult initializeVRTracking();
     InitResult initializeAudioEngine();
     InitResult initializeOverlayUI();
-    InitResult initializeWindowsGUI();
-    InitResult initializeHeadsetSupport();
     InitResult connectComponents();
 
     // Shutdown phases
@@ -147,7 +145,7 @@ private:
     std::unique_ptr<HRTFProcessor> m_hrtf;
     std::unique_ptr<VRTracker> m_vrTracker;
     std::unique_ptr<AudioEngine> m_audioEngine;
-    std::unique_ptr<OverlayUI> m_overlay;
+    std::unique_ptr<AudioRoutingOverlay> m_audioCockpit;  // NEW: Creative Audio Cockpit!
 
     // Component management
     std::vector<std::unique_ptr<IComponent>> m_components;
