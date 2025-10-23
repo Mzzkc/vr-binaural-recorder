@@ -58,6 +58,9 @@ if(WIN32)
     set(PA_USE_WASAPI ON CACHE BOOL "Enable WASAPI" FORCE)
 endif()
 
+# Workaround for PortAudio's old CMake version requirement
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5 CACHE STRING "Minimum CMake policy version" FORCE)
+
 # spdlog
 FetchContent_Declare(
     spdlog

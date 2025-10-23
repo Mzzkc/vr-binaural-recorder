@@ -39,8 +39,7 @@ if(MSVC)
     add_compile_options(/wd4251) # Disable DLL interface warning
     add_compile_options(/wd4275) # Disable non-DLL interface base class warning
 
-    # Windows subsystem targeting
-    set_property(TARGET vr_binaural_recorder PROPERTY WIN32_EXECUTABLE TRUE)
+    # Note: WIN32_EXECUTABLE property will be set in configure_windows_target() function
 
 elseif(MINGW)
     # MinGW-specific optimizations
