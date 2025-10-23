@@ -56,17 +56,32 @@ Write-Host ""
 # Extract OpenVR SDK if needed
 Write-Host "[INFO] Checking OpenVR SDK..." -ForegroundColor Yellow
 $openvrPath = Join-Path $ProjectRoot "third_party\openvr"
+$openvrDLL = Join-Path $ProjectRoot "third_party\openvr\bin\win64\openvr_api.dll"
+$openvrHeader = Join-Path $ProjectRoot "third_party\openvr\headers\openvr.h"
 $openvrTarball = Join-Path $ProjectRoot "third_party\v1.23.7.tar.gz"
 
-if (-not (Test-Path $openvrPath)) {
+# Check if OpenVR is properly extracted (not just directory exists)
+if (-not (Test-Path $openvrDLL) -or -not (Test-Path $openvrHeader)) {
     if (-not (Test-Path $openvrTarball)) {
         Write-Host "[ERROR] OpenVR SDK tarball not found: $openvrTarball" -ForegroundColor Red
         exit 1
     }
 
+    # Remove incomplete extraction if exists
+    if (Test-Path $openvrPath) {
+        Write-Host "[INFO] Removing incomplete OpenVR extraction..." -ForegroundColor Yellow
+        Remove-Item -Path $openvrPath -Force -Recurse -ErrorAction SilentlyContinue
+    }
+
     Write-Host "[INFO] Extracting OpenVR SDK..." -ForegroundColor Yellow
     Set-Location (Join-Path $ProjectRoot "third_party")
     tar -xzf v1.23.7.tar.gz
+
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] Failed to extract OpenVR SDK" -ForegroundColor Red
+        Set-Location $ProjectRoot
+        exit 1
+    }
 
     # Create junction (works without admin)
     Write-Host "[INFO] Creating openvr junction..." -ForegroundColor Yellow
@@ -77,7 +92,18 @@ if (-not (Test-Path $openvrPath)) {
     cmd /c "mklink /J include headers"
 
     Set-Location $ProjectRoot
-    Write-Host "[OK] OpenVR SDK extracted" -ForegroundColor Green
+
+    # Verify extraction
+    if (-not (Test-Path $openvrDLL)) {
+        Write-Host "[ERROR] OpenVR DLL not found after extraction: $openvrDLL" -ForegroundColor Red
+        exit 1
+    }
+    if (-not (Test-Path $openvrHeader)) {
+        Write-Host "[ERROR] OpenVR header not found after extraction: $openvrHeader" -ForegroundColor Red
+        exit 1
+    }
+
+    Write-Host "[OK] OpenVR SDK extracted and verified" -ForegroundColor Green
 } else {
     Write-Host "[OK] OpenVR SDK already extracted" -ForegroundColor Green
 }

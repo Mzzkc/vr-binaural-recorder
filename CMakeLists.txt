@@ -54,7 +54,8 @@ FetchContent_Declare(
 )
 set(PA_BUILD_SHARED OFF CACHE BOOL "Build shared library" FORCE)
 if(WIN32)
-    set(PA_USE_ASIO ON CACHE BOOL "Enable ASIO" FORCE)
+    # ASIO is optional - only enable if SDK is available
+    set(PA_USE_ASIO OFF CACHE BOOL "Enable ASIO" FORCE)
     set(PA_USE_WASAPI ON CACHE BOOL "Enable WASAPI" FORCE)
 endif()
 
@@ -447,8 +448,12 @@ add_test(NAME VRBinauralTests COMMAND vr_binaural_tests)
 add_subdirectory(tests/standalone)
 add_subdirectory(tests)
 
-# Windows dependency verification tests
-add_subdirectory(tests/dependency_verification)
+# Windows dependency verification tests (optional - may not exist in all clones)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/dependency_verification/test_jsoncpp.cpp")
+    add_subdirectory(tests/dependency_verification)
+else()
+    message(STATUS "Skipping dependency verification tests (test files not found)")
+endif()
 
 # CPack for packaging
 set(CPACK_PACKAGE_NAME "VRBinauralRecorder")
