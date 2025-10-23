@@ -49,11 +49,18 @@ if(WIN32)
     set(PA_USE_WASAPI ON CACHE BOOL "Enable WASAPI" FORCE)
     # ASIO is optional - disable for now since SDK may not be available
     set(PA_USE_ASIO OFF CACHE BOOL "Enable ASIO" FORCE)
-    set(PA_USE_DIRECTSOUND ON CACHE BOOL "Enable DirectSound" FORCE)
+    # Disable DirectSound - causes Windows SDK header conflicts, WASAPI is preferred
+    set(PA_USE_DS OFF CACHE BOOL "Disable DirectSound" FORCE)
+    set(PA_USE_WDMKS OFF CACHE BOOL "Disable WDM-KS" FORCE)
 endif()
 
 # Make dependencies available
 FetchContent_MakeAvailable(jsoncpp portaudio)
+
+# Disable warnings-as-errors for third-party PortAudio library on Windows
+if(WIN32 AND MSVC AND TARGET portaudio_static)
+    target_compile_options(portaudio_static PRIVATE /WX-)
+endif()
 
 # Test 1: jsoncpp verification
 add_executable(test_jsoncpp test_jsoncpp.cpp)

@@ -57,6 +57,9 @@ if(WIN32)
     # ASIO is optional - only enable if SDK is available
     set(PA_USE_ASIO OFF CACHE BOOL "Enable ASIO" FORCE)
     set(PA_USE_WASAPI ON CACHE BOOL "Enable WASAPI" FORCE)
+    # Disable DirectSound - causes Windows SDK header conflicts, WASAPI is preferred
+    set(PA_USE_DS OFF CACHE BOOL "Disable DirectSound" FORCE)
+    set(PA_USE_WDMKS OFF CACHE BOOL "Disable WDM-KS" FORCE)
 endif()
 
 # Workaround for PortAudio's old CMake version requirement
@@ -162,6 +165,16 @@ else()
     FetchContent_MakeAvailable(portaudio spdlog jsoncpp imgui glfw)
     # Link the FetchContent target to the interface for uniform usage
     target_link_libraries(jsoncpp_interface INTERFACE jsoncpp_lib)
+endif()
+
+# Disable warnings-as-errors for third-party PortAudio library on Windows
+if(WIN32 AND MSVC AND TARGET portaudio_static)
+    target_compile_options(portaudio_static PRIVATE /WX-)
+    # Also disable for any PortAudio object libraries
+    get_target_property(PA_SOURCES portaudio_static SOURCES)
+    if(PA_SOURCES)
+        set_source_files_properties(${PA_SOURCES} PROPERTIES COMPILE_FLAGS "/WX-")
+    endif()
 endif()
 
 # Source files organized by module

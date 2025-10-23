@@ -3,6 +3,7 @@
 
 #include <gtest/gtest.h>
 #include <iostream>
+#define _USE_MATH_DEFINES
 #include <cmath>
 #include <vector>
 #include "../modules/audio/hrtf_processor.h"
