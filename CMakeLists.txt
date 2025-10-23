@@ -448,12 +448,8 @@ add_test(NAME VRBinauralTests COMMAND vr_binaural_tests)
 add_subdirectory(tests/standalone)
 add_subdirectory(tests)
 
-# Windows dependency verification tests (optional - may not exist in all clones)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/tests/dependency_verification/test_jsoncpp.cpp")
-    add_subdirectory(tests/dependency_verification)
-else()
-    message(STATUS "Skipping dependency verification tests (test files not found)")
-endif()
+# Windows dependency verification tests
+add_subdirectory(tests/dependency_verification)
 
 # CPack for packaging
 set(CPACK_PACKAGE_NAME "VRBinauralRecorder")

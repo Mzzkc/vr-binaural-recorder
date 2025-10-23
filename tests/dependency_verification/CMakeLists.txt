@@ -55,8 +55,7 @@ endif()
 FetchContent_MakeAvailable(jsoncpp portaudio)
 
 # Test 1: jsoncpp verification
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/test_jsoncpp.cpp")
-    add_executable(test_jsoncpp test_jsoncpp.cpp)
+add_executable(test_jsoncpp test_jsoncpp.cpp)
 
 target_link_libraries(test_jsoncpp PRIVATE
     jsoncpp_lib

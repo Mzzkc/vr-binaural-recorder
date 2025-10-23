@@ -129,9 +129,11 @@ test_config*.json
 test_results.xml
 qa_*test*
 invalid_config_test.json
-test_*.cpp
+/test_*.cpp
 test_*.txt
 test_env_detection.*
+# Allow intentional test files in tests/ subdirectory
+!tests/**/test_*.cpp
 
 # Third-party dependencies (if downloaded/extracted)
 third_party/downloads/
