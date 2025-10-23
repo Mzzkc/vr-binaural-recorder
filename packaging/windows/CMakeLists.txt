@@ -12,7 +12,6 @@ find_program(NSIS_MAKENSIS
         "C:/Program Files (x86)/NSIS"
         "C:/Program Files/NSIS"
         "$ENV{ProgramFiles}/NSIS"
-        "$ENV{ProgramFiles(x86)}/NSIS"
     DOC "NSIS makensis compiler"
 )
 
