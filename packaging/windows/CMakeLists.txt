@@ -41,10 +41,13 @@ else()
     message(STATUS "OpenVR DLL found: ${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll")
 endif()
 
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h")
-    message(WARNING "OpenVR header not found at: ${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h - build may fail")
-else()
+# Check for OpenVR headers (include is a symlink, headers is the real directory)
+if(EXISTS "${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h")
     message(STATUS "OpenVR header found: ${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h")
+elseif(EXISTS "${CMAKE_SOURCE_DIR}/third_party/openvr/headers/openvr.h")
+    message(STATUS "OpenVR header found: ${CMAKE_SOURCE_DIR}/third_party/openvr/headers/openvr.h")
+else()
+    message(WARNING "OpenVR header not found - build may fail")
 endif()
 
 if(NOT EXISTS "${CMAKE_SOURCE_DIR}/hrtf_data")
@@ -280,11 +283,13 @@ if(WIX_CANDLE AND WIX_LIGHT)
 endif()
 
 # Create Windows build info file
-configure_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/build-info.json.in"
-    "${INSTALLER_OUTPUT_DIR}/build-info.json"
-    @ONLY
-)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/build-info.json.in")
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/build-info.json.in"
+        "${INSTALLER_OUTPUT_DIR}/build-info.json"
+        @ONLY
+    )
+endif()
 
 # Summary
 message(STATUS "Windows packaging configured:")

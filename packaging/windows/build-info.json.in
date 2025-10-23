@@ -1,0 +1,17 @@
+{
+  "project": "@PROJECT_NAME@",
+  "version": "@PROJECT_VERSION@",
+  "build_type": "@CMAKE_BUILD_TYPE@",
+  "compiler": "@CMAKE_CXX_COMPILER_ID@",
+  "compiler_version": "@CMAKE_CXX_COMPILER_VERSION@",
+  "build_date": "@BUILD_DATE@",
+  "git_commit": "@GIT_COMMIT_HASH@",
+  "platform": "Windows",
+  "architecture": "x64",
+  "features": {
+    "vr_support": true,
+    "spatial_audio": true,
+    "wasapi": true,
+    "asio": true
+  }
+}
