@@ -47,7 +47,8 @@ FetchContent_Declare(
 set(PA_BUILD_SHARED OFF CACHE BOOL "Build shared library" FORCE)
 if(WIN32)
     set(PA_USE_WASAPI ON CACHE BOOL "Enable WASAPI" FORCE)
-    set(PA_USE_ASIO ON CACHE BOOL "Enable ASIO" FORCE)
+    # ASIO is optional - disable for now since SDK may not be available
+    set(PA_USE_ASIO OFF CACHE BOOL "Enable ASIO" FORCE)
     set(PA_USE_DIRECTSOUND ON CACHE BOOL "Enable DirectSound" FORCE)
 endif()
 
