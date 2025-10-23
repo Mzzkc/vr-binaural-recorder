@@ -164,9 +164,11 @@ if(JSONCPP_USE_SYSTEM)
 else()
     FetchContent_MakeAvailable(portaudio spdlog jsoncpp imgui glfw)
     # Link the FetchContent target to the interface for uniform usage
-    target_link_libraries(jsoncpp_interface INTERFACE jsoncpp_lib)
+    # jsoncpp creates jsoncpp_static when BUILD_STATIC_LIBS=ON (set above)
+    # and jsoncpp_lib when BUILD_SHARED_LIBS=ON
+    target_link_libraries(jsoncpp_interface INTERFACE jsoncpp_static)
     # Add include directories for jsoncpp
-    get_target_property(JSONCPP_INCLUDE_DIRS jsoncpp_lib INTERFACE_INCLUDE_DIRECTORIES)
+    get_target_property(JSONCPP_INCLUDE_DIRS jsoncpp_static INTERFACE_INCLUDE_DIRECTORIES)
     target_include_directories(jsoncpp_interface INTERFACE ${JSONCPP_INCLUDE_DIRS})
 endif()
 
