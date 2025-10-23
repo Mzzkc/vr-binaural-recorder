@@ -33,7 +33,7 @@ protected:
     // Generate test tone for spatial validation
     void GenerateTestTone(float* buffer, int frames, float frequency = 440.0f, float amplitude = 0.5f) {
         for (int i = 0; i < frames; ++i) {
-            buffer[i] = amplitude * std::sin(2.0f * M_PI * frequency * i / SAMPLE_RATE);
+            buffer[i] = amplitude * static_cast<float>(std::sin(2.0 * M_PI * frequency * i / SAMPLE_RATE));
         }
     }
 

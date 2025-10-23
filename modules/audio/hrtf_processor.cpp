@@ -174,8 +174,8 @@ void HRTFProcessor::SetListenerPosition(const Vec3& position) {
     // Calculate azimuth and elevation from position
     float azimuth = 0.0f, elevation = 0.0f;
     if (distance > 0.01f) {
-        azimuth = std::atan2(position.x, -position.z) * 180.0f / M_PI;
-        elevation = std::asin(position.y / distance) * 180.0f / M_PI;
+        azimuth = static_cast<float>(std::atan2(position.x, -position.z) * 180.0 / M_PI);
+        elevation = static_cast<float>(std::asin(position.y / distance) * 180.0 / M_PI);
     }
 
     // Update interpolation engine target values for smooth processing
@@ -240,11 +240,11 @@ void HRTFProcessor::CalculateAngles(const VRPose& headPose, const VRPose& micPos
     distance = std::sqrt(dx*dx + dy*dy + dz*dz);
 
     // Calculate azimuth (horizontal angle)
-    azimuth = std::atan2(dx, -dz) * 180.0f / M_PI;
+    azimuth = static_cast<float>(std::atan2(dx, -dz) * 180.0 / M_PI);
 
     // Calculate elevation (vertical angle)
     float horizontalDistance = std::sqrt(dx*dx + dz*dz);
-    elevation = std::atan2(dy, horizontalDistance) * 180.0f / M_PI;
+    elevation = static_cast<float>(std::atan2(dy, horizontalDistance) * 180.0 / M_PI);
 
     // Normalize angles
     while (azimuth < -180.0f) azimuth += 360.0f;
@@ -428,11 +428,11 @@ bool HRTFProcessor::GenerateHighQualitySyntheticHRTF() {
 
                     // Left ear: attenuated for right-side sources (positive azimuth)
                     float leftAttenuation = (azimuth > 0) ? 1.0f - (azimuth / 180.0f) * 0.7f : 1.0f;
-                    filter.left[i] = leftAttenuation * std::exp(-delay * 1000.0f) * std::sin(delay * 2.0f * M_PI * 1000.0f);
+                    filter.left[i] = leftAttenuation * static_cast<float>(std::exp(-delay * 1000.0) * std::sin(delay * 2.0 * M_PI * 1000.0));
 
                     // Right ear: attenuated for left-side sources (negative azimuth)
                     float rightAttenuation = (azimuth < 0) ? 1.0f - (-azimuth / 180.0f) * 0.7f : 1.0f;
-                    filter.right[i] = rightAttenuation * std::exp(-delay * 1000.0f) * std::sin(delay * 2.0f * M_PI * 1000.0f);
+                    filter.right[i] = rightAttenuation * static_cast<float>(std::exp(-delay * 1000.0) * std::sin(delay * 2.0 * M_PI * 1000.0));
 
                     // Apply elevation effects (frequency filtering)
                     if (elevation > 0) {  // Above

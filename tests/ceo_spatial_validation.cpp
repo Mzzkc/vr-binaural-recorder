@@ -33,7 +33,7 @@ TEST_F(CEOSpatialValidationTest, CompleteASMRtistWorkflowValidation) {
     std::vector<float> spatialOutput(FRAME_SIZE * 2);
 
     for (int i = 0; i < FRAME_SIZE; ++i) {
-        micInput[i] = 0.3f * std::sin(2.0f * M_PI * 200.0f * i / 48000.0f);
+        micInput[i] = 0.3f * static_cast<float>(std::sin(2.0 * M_PI * 200.0 * i / 48000.0));
     }
 
     // Test Case 1: LEFT EAR positioning (ASMRtist whispers in left ear)
@@ -92,7 +92,7 @@ TEST_F(CEOSpatialValidationTest, AudioCockpitIntegrationProof) {
 
     // Generate test signal
     for (int i = 0; i < FRAME_SIZE; ++i) {
-        input[i] = 0.2f * std::sin(2.0f * M_PI * 440.0f * i / 48000.0f);
+        input[i] = 0.2f * static_cast<float>(std::sin(2.0 * M_PI * 440.0 * i / 48000.0));
     }
 
     // Simulate ASMRtist moving virtual microphone from center to left to right

@@ -46,12 +46,12 @@ FetchContent_Declare(
 # Configure PortAudio for Windows
 set(PA_BUILD_SHARED OFF CACHE BOOL "Build shared library" FORCE)
 if(WIN32)
-    set(PA_USE_WASAPI ON CACHE BOOL "Enable WASAPI" FORCE)
-    # ASIO is optional - disable for now since SDK may not be available
+    # Use only WMME (Windows Multimedia Extensions) - simplest, most compatible
     set(PA_USE_ASIO OFF CACHE BOOL "Enable ASIO" FORCE)
-    # Disable DirectSound - causes Windows SDK header conflicts, WASAPI is preferred
+    set(PA_USE_WASAPI OFF CACHE BOOL "Disable WASAPI" FORCE)
     set(PA_USE_DS OFF CACHE BOOL "Disable DirectSound" FORCE)
     set(PA_USE_WDMKS OFF CACHE BOOL "Disable WDM-KS" FORCE)
+    set(PA_USE_WMME ON CACHE BOOL "Enable WMME" FORCE)
 endif()
 
 # Make dependencies available
