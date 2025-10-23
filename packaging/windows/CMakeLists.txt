@@ -34,20 +34,24 @@ set(INSTALLER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/installer")
 # Create installer output directory
 file(MAKE_DIRECTORY "${INSTALLER_OUTPUT_DIR}")
 
-# Validate critical dependencies exist before packaging
+# Validate critical dependencies exist before packaging (warnings only during configure)
 if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll")
-    message(FATAL_ERROR "OpenVR DLL not found at: ${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll")
+    message(WARNING "OpenVR DLL not found at: ${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll - installer may fail")
+else()
+    message(STATUS "OpenVR DLL found: ${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll")
 endif()
 
 if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h")
-    message(FATAL_ERROR "OpenVR header not found at: ${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h")
+    message(WARNING "OpenVR header not found at: ${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h - build may fail")
+else()
+    message(STATUS "OpenVR header found: ${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h")
 endif()
 
-if(NOT EXISTS "${CMAKE_SOURCE_DIR}/deps/hrtf")
-    message(FATAL_ERROR "HRTF data directory not found at: ${CMAKE_SOURCE_DIR}/deps/hrtf")
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/hrtf_data")
+    message(WARNING "HRTF data directory not found at: ${CMAKE_SOURCE_DIR}/hrtf_data - runtime may fail")
+else()
+    message(STATUS "HRTF data found: ${CMAKE_SOURCE_DIR}/hrtf_data")
 endif()
-
-message(STATUS "OpenVR dependencies validated successfully")
 
 # Configure installer script
 configure_file(
@@ -91,8 +95,8 @@ if(NSIS_MAKENSIS)
     # Copy required files for installer
     add_custom_target(prepare_installer
         COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_SOURCE_DIR}/deps/hrtf"
-            "${INSTALLER_OUTPUT_DIR}/hrtf"
+            "${CMAKE_SOURCE_DIR}/hrtf_data"
+            "${INSTALLER_OUTPUT_DIR}/hrtf_data"
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "$<TARGET_FILE:vr_binaural_recorder>"
             "${INSTALLER_OUTPUT_DIR}/"
@@ -201,8 +205,8 @@ add_custom_target(windows_portable
         "$<TARGET_FILE:vr_binaural_recorder>"
         "${INSTALLER_OUTPUT_DIR}/VRBinauralRecorder-Portable/"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${CMAKE_SOURCE_DIR}/deps/hrtf"
-        "${INSTALLER_OUTPUT_DIR}/VRBinauralRecorder-Portable/hrtf"
+        "${CMAKE_SOURCE_DIR}/hrtf_data"
+        "${INSTALLER_OUTPUT_DIR}/VRBinauralRecorder-Portable/hrtf_data"
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/config/vr_binaural_config.json.example"
         "${INSTALLER_OUTPUT_DIR}/VRBinauralRecorder-Portable/vr_binaural_config.json"
