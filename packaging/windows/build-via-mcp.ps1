@@ -62,9 +62,20 @@ $openvrTarball = Join-Path $ProjectRoot "third_party\v1.23.7.tar.gz"
 
 # Check if OpenVR is properly extracted (not just directory exists)
 if (-not (Test-Path $openvrDLL) -or -not (Test-Path $openvrHeader)) {
+    # Download tarball if missing
     if (-not (Test-Path $openvrTarball)) {
-        Write-Host "[ERROR] OpenVR SDK tarball not found: $openvrTarball" -ForegroundColor Red
-        exit 1
+        Write-Host "[INFO] Downloading OpenVR SDK v1.23.7..." -ForegroundColor Yellow
+        $openvrUrl = "https://github.com/ValveSoftware/openvr/archive/refs/tags/v1.23.7.tar.gz"
+
+        try {
+            Invoke-WebRequest -Uri $openvrUrl -OutFile $openvrTarball -UseBasicParsing
+            Write-Host "[OK] Downloaded OpenVR SDK" -ForegroundColor Green
+        }
+        catch {
+            Write-Host "[ERROR] Failed to download OpenVR SDK from $openvrUrl" -ForegroundColor Red
+            Write-Host "[ERROR] $_" -ForegroundColor Red
+            exit 1
+        }
     }
 
     # Remove incomplete extraction if exists
