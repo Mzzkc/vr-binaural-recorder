@@ -1,11 +1,11 @@
 // hrtf_processor.cpp - Head-Related Transfer Function Processing Implementation
 
-#include "hrtf_processor.h"
-#include "logger.h"
-#include <algorithm>
-#include <cstring>
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <algorithm>
+#include <cstring>
+#include "hrtf_processor.h"
+#include "logger.h"
 
 namespace vrb {
 

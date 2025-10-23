@@ -168,12 +168,14 @@ else()
 endif()
 
 # Disable warnings-as-errors for third-party PortAudio library on Windows
+# Also remove WIN32_LEAN_AND_MEAN for PortAudio to get full Windows SDK headers
 if(WIN32 AND MSVC AND TARGET portaudio_static)
     target_compile_options(portaudio_static PRIVATE /WX-)
-    # Also disable for any PortAudio object libraries
-    get_target_property(PA_SOURCES portaudio_static SOURCES)
-    if(PA_SOURCES)
-        set_source_files_properties(${PA_SOURCES} PROPERTIES COMPILE_FLAGS "/WX-")
+    # PortAudio WASAPI needs full Windows SDK headers - undefine WIN32_LEAN_AND_MEAN
+    get_target_property(PA_COMPILE_DEFS portaudio_static COMPILE_DEFINITIONS)
+    if(PA_COMPILE_DEFS)
+        list(REMOVE_ITEM PA_COMPILE_DEFS WIN32_LEAN_AND_MEAN)
+        set_target_properties(portaudio_static PROPERTIES COMPILE_DEFINITIONS "${PA_COMPILE_DEFS}")
     endif()
 endif()
 

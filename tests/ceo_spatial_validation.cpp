@@ -1,11 +1,11 @@
 // ceo_spatial_validation.cpp - Alex Kim (Creative Coder) - CEO Pipeline Validation
 // CRITICAL PROOF: Complete pipeline validation for CEO approval
 
-#include <gtest/gtest.h>
-#include <iostream>
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <iostream>
 #include <vector>
+#include <gtest/gtest.h>
 #include "../modules/audio/hrtf_processor.h"
 #include "../core/include/vr_types.h"
 

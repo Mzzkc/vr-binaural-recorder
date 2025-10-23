@@ -4,13 +4,13 @@
 // MISSION: Create tests that ASMRtists would fail on if spatial audio is broken
 // NO DEPLOYMENT until these pass. NO EXCEPTIONS.
 
-#include <gtest/gtest.h>
-#include "../modules/audio/hrtf_processor.h"
-#include "../core/include/vr_types.h"
 #define _USE_MATH_DEFINES
 #include <cmath>
 #include <vector>
 #include <numeric>
+#include <gtest/gtest.h>
+#include "../modules/audio/hrtf_processor.h"
+#include "../core/include/vr_types.h"
 
 using namespace vrb;
 
