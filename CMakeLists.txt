@@ -165,6 +165,9 @@ else()
     FetchContent_MakeAvailable(portaudio spdlog jsoncpp imgui glfw)
     # Link the FetchContent target to the interface for uniform usage
     target_link_libraries(jsoncpp_interface INTERFACE jsoncpp_lib)
+    # Add include directories for jsoncpp
+    get_target_property(JSONCPP_INCLUDE_DIRS jsoncpp_lib INTERFACE_INCLUDE_DIRECTORIES)
+    target_include_directories(jsoncpp_interface INTERFACE ${JSONCPP_INCLUDE_DIRS})
 endif()
 
 # Disable warnings-as-errors for third-party PortAudio library on Windows

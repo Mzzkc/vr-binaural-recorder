@@ -318,11 +318,11 @@ namespace StringUtils {
      */
     inline std::string formatTimeMs(double timeMs) {
         if (timeMs < 1.0) {
-            return formatFloat(timeMs * 1000.0f, 1) + " μs";
+            return formatFloat(static_cast<float>(timeMs * 1000.0), 1) + " μs";
         } else if (timeMs < 1000.0) {
-            return formatFloat(timeMs, 2) + " ms";
+            return formatFloat(static_cast<float>(timeMs), 2) + " ms";
         } else {
-            return formatFloat(timeMs / 1000.0f, 2) + " s";
+            return formatFloat(static_cast<float>(timeMs / 1000.0), 2) + " s";
         }
     }
 
@@ -339,7 +339,7 @@ namespace StringUtils {
             unitIndex++;
         }
 
-        return formatFloat(size, 2) + " " + units[unitIndex];
+        return formatFloat(static_cast<float>(size), 2) + " " + units[unitIndex];
     }
 
     /**
