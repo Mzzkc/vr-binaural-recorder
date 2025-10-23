@@ -228,6 +228,12 @@ public:
      */
     void SetAdaptiveBuffering(bool enable);
 
+    /**
+     * @brief Static method to enumerate available audio devices without initializing AudioEngine
+     * @return Vector of available input devices with detailed information
+     */
+    static std::vector<DeviceInfo> EnumerateAudioDevices();
+
 private:
     /**
      * @brief PortAudio callback for audio processing

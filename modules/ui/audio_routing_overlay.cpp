@@ -1,16 +1,15 @@
-// audio_routing_overlay.cpp - The Audio Cockpit Implementation!
-// 🎧 Where boring audio routing becomes VR magic! 🎧
+// audio_routing_overlay.cpp - Simple ASMRtist Microphone Positioning
+// Simple tools for content creators to position their mic in VR space
 
 #include "audio_routing_overlay.h"
-#include "logger.h"
+#include "../../core/include/logger.h"
 #include <algorithm>
 #include <cmath>
 #include <cstring>
 
-// Quick OpenGL includes - we'll make this work cross-platform later!
+// Simple OpenGL includes
 #ifdef _WIN32
     #include <GL/glew.h>
-    #include <GL/wglext.h>
 #else
     #define GL_GLEXT_PROTOTYPES
     #include <GL/gl.h>
@@ -19,17 +18,11 @@
 
 namespace vrb {
 
-// === CREATIVE CONSTANTS ===
+// Simple constants for ASMRtist workflow
 constexpr float PI = 3.14159265359f;
-constexpr float TWO_PI = 6.28318530718f;
-constexpr float HALF_PI = 1.57079632679f;
-
-// Magic numbers that just WORK!
-constexpr float AUDIO_ORB_BASE_SIZE = 0.08f;     // Base orb size
-constexpr float AUDIO_ORB_MAX_SIZE = 0.25f;      // Max orb size when loud
-constexpr float PARTICLE_EMIT_RATE = 30.0f;     // Particles per second
-constexpr float GESTURE_DEADZONE = 0.02f;       // Controller deadzone
-constexpr float GRAB_DISTANCE = 0.15f;          // Grab tolerance
+constexpr float MIC_VISUAL_SIZE = 0.05f;       // Small, non-intrusive mic representation
+constexpr float DRAG_TOLERANCE = 0.2f;        // How close controller needs to be to grab mic
+constexpr float AUTO_HIDE_DELAY = 3.0f;       // Hide UI after 3 seconds of no interaction
 
 AudioRoutingOverlay::AudioRoutingOverlay() {
     // Initialize overlay transform to identity
@@ -38,10 +31,11 @@ AudioRoutingOverlay::AudioRoutingOverlay() {
     m_overlayTransform.m[1][1] = 1.0f;
     m_overlayTransform.m[2][2] = 1.0f;
 
-    // Initialize HRTF presets - instant audio magic!
-    InitializePresets();
+    // Set default microphone position in front of user at head height
+    m_virtualMic.position = Vec3{0, 1.5f, -1.0f};  // 1 meter in front, head height
+    m_virtualMic.orientation = Vec3{0, 0, -1};      // Facing forward
 
-    LOG_INFO("AudioRoutingOverlay constructed - ready to make audio routing AWESOME!");
+    LOG_INFO("AudioRoutingOverlay initialized for ASMRtist workflow");
 }
 
 AudioRoutingOverlay::~AudioRoutingOverlay() {
@@ -54,42 +48,25 @@ bool AudioRoutingOverlay::Initialize(VRTracker* vrTracker, AudioEngine* audioEng
         return true;
     }
 
-    LOG_INFO("Initializing the Audio Cockpit - prepare for VR audio magic! 🚀");
+    LOG_INFO("Initializing simple VR microphone positioning interface");
 
     m_vrTracker = vrTracker;
     m_audioEngine = audioEngine;
 
-    // Create the ACTUAL SteamVR overlay - this is where the magic happens!
+    // Create basic SteamVR overlay for minimal UI
     if (!CreateOverlay()) {
-        LOG_ERROR("Failed to create SteamVR overlay - can't display the Audio Cockpit!");
+        LOG_ERROR("Failed to create VR overlay");
         return false;
     }
 
-    // Create OpenGL render target for our beautiful visuals
+    // Create simple render target
     if (!CreateRenderTarget()) {
-        LOG_ERROR("Failed to create render target - no pretty graphics for you!");
+        LOG_ERROR("Failed to create render target");
         return false;
-    }
-
-    // Set up some default audio sources to play with
-    AddAudioSource("Game Audio");
-    AddAudioSource("Voice Chat");
-    AddAudioSource("Music");
-    AddAudioSource("System Sounds");
-
-    // Position audio orbs in a nice circle around the user
-    float angle = 0.0f;
-    for (auto& [name, source] : m_audioSources) {
-        source->orbPosition = Vec3{
-            std::sin(angle) * 0.5f,
-            0.0f,
-            std::cos(angle) * 0.5f
-        };
-        angle += TWO_PI / m_audioSources.size();
     }
 
     m_initialized = true;
-    LOG_INFO("Audio Cockpit initialized successfully - let the audio magic begin!");
+    LOG_INFO("VR microphone positioning ready for ASMRtists!");
     return true;
 }
 
@@ -98,36 +75,24 @@ void AudioRoutingOverlay::Update() {
         return;
     }
 
-    // Sync to VR compositor timing for buttery smooth rendering
-    SyncToCompositor();
-
-    // Update controller states and process gestures
+    // Simple controller tracking for microphone positioning
     UpdateControllerStates();
-    ProcessGestures();
 
-    // Update our magical audio orbs
-    UpdateAudioOrbs();
+    // Handle microphone drag-to-position
+    HandleMicrophonePositioning();
 
-    // Update particle system for beautiful visualization
-    UpdateParticleSystem();
+    // Update audio levels for monitoring
+    UpdateAudioLevels();
 
-    // Update audio visualization data
-    UpdateAudioVisualization();
-
-    // Handle auto-hide functionality
+    // Handle auto-hide for minimal interface
     HandleAutoHide();
 
+    // Update visual display
     if (m_visible.load()) {
-        // Render the beautiful Audio Cockpit
         RenderToTexture();
         UpdateOverlayTexture();
+        UpdateOverlayTransform();
     }
-
-    // Update overlay position
-    UpdateOverlayTransform();
-
-    // Update metrics for performance monitoring
-    UpdateMetrics();
 }
 
 void AudioRoutingOverlay::Shutdown() {
@@ -135,77 +100,671 @@ void AudioRoutingOverlay::Shutdown() {
         return;
     }
 
-    LOG_INFO("Shutting down Audio Cockpit - audio routing magic is ending!");
-
     DestroyRenderTarget();
     DestroyOverlay();
 
-    m_audioSources.clear();
-    m_particles.clear();
-
     m_initialized = false;
+    LOG_INFO("AudioRoutingOverlay shutdown complete");
 }
 
-// === CREATIVE OVERLAY CREATION ===
+// === ASMR-FOCUSED FUNCTIONALITY ===
+
+void AudioRoutingOverlay::SetMicrophonePosition(const Vec3& position) {
+    m_virtualMic.position = position;
+
+    // Update HRTF processor if connected
+    if (m_hrtfProcessor) {
+        // Convert microphone position to listener position for spatial processing
+        m_hrtfProcessor->SetListenerPosition(position);
+    }
+
+    LOG_DEBUG("Microphone position set to ({}, {}, {})", position.x, position.y, position.z);
+}
+
+void AudioRoutingOverlay::SetMicrophoneOrientation(const Vec3& forward) {
+    m_virtualMic.orientation = forward;
+
+    if (m_hrtfProcessor) {
+        m_hrtfProcessor->SetListenerOrientation(forward);
+    }
+}
+
+Vec3 AudioRoutingOverlay::GetMicrophonePosition() const {
+    return m_virtualMic.position;
+}
+
+void AudioRoutingOverlay::StartRecording() {
+    m_isRecording = true;
+    m_virtualMic.isActive = true;
+    m_uiState.lastInteraction = std::chrono::steady_clock::now();  // Show UI during recording
+
+    LOG_INFO("Recording started - microphone active at position ({}, {}, {})",
+             m_virtualMic.position.x, m_virtualMic.position.y, m_virtualMic.position.z);
+}
+
+void AudioRoutingOverlay::StopRecording() {
+    m_isRecording = false;
+    m_virtualMic.isActive = false;
+
+    LOG_INFO("Recording stopped");
+}
+
+bool AudioRoutingOverlay::IsRecording() const {
+    return m_isRecording.load();
+}
+
+void AudioRoutingOverlay::SetMonitoring(bool enabled) {
+    m_uiState.monitoring = enabled;
+
+    if (enabled) {
+        LOG_INFO("Audio monitoring enabled - you can hear spatial effects in real-time");
+    } else {
+        LOG_INFO("Audio monitoring disabled");
+    }
+}
+
+float AudioRoutingOverlay::GetInputLevel() const {
+    return m_inputLevel.load();
+}
+
+float AudioRoutingOverlay::GetSpatializedOutputLevel() const {
+    return m_outputLevel.load();
+}
+
+// === SIMPLE VR INTERACTION ===
+
+void AudioRoutingOverlay::UpdateControllerTracking(const std::vector<VRPose>& controllers) {
+    // Update controller positions for simple microphone positioning
+    if (controllers.size() >= 1) {
+        m_leftController.position = controllers[0].position;
+        m_leftController.triggerPressed = controllers[0].trigger > 0.5f;
+    }
+
+    if (controllers.size() >= 2) {
+        m_rightController.position = controllers[1].position;
+        m_rightController.triggerPressed = controllers[1].trigger > 0.5f;
+    }
+}
+
+void AudioRoutingOverlay::UpdateMicrophoneTracking(const VRPose& hmdPose) {
+    // Optional: Auto-position microphone relative to head movement
+    // This could be useful for some ASMRtist workflows
+}
+
+void AudioRoutingOverlay::UpdateControllerStates() {
+    // Simple state tracking for trigger press/release
+    m_leftController.wasTriggered = m_leftController.triggerPressed;
+    m_rightController.wasTriggered = m_rightController.triggerPressed;
+}
+
+void AudioRoutingOverlay::HandleMicrophonePositioning() {
+    // Check if either controller is near the microphone and trigger is pressed
+    bool leftNearMic = IsControllerNearMicrophone(m_leftController.position);
+    bool rightNearMic = IsControllerNearMicrophone(m_rightController.position);
+
+    // Start dragging microphone
+    if ((leftNearMic && m_leftController.triggerPressed && !m_leftController.wasTriggered) ||
+        (rightNearMic && m_rightController.triggerPressed && !m_rightController.wasTriggered)) {
+
+        if (leftNearMic) m_leftController.isDraggingMic = true;
+        if (rightNearMic) m_rightController.isDraggingMic = true;
+
+        m_uiState.lastInteraction = std::chrono::steady_clock::now();
+        LOG_DEBUG("Started dragging microphone");
+    }
+
+    // Update microphone position while dragging
+    if (m_leftController.isDraggingMic && m_leftController.triggerPressed) {
+        SetMicrophonePosition(m_leftController.position);
+    } else if (m_rightController.isDraggingMic && m_rightController.triggerPressed) {
+        SetMicrophonePosition(m_rightController.position);
+    }
+
+    // Stop dragging when trigger is released
+    if (m_leftController.isDraggingMic && !m_leftController.triggerPressed) {
+        m_leftController.isDraggingMic = false;
+        LOG_DEBUG("Stopped dragging microphone with left controller");
+    }
+    if (m_rightController.isDraggingMic && !m_rightController.triggerPressed) {
+        m_rightController.isDraggingMic = false;
+        LOG_DEBUG("Stopped dragging microphone with right controller");
+    }
+}
+
+// === SIMPLE UI RENDERING ===
+
+void AudioRoutingOverlay::RenderToTexture() {
+    glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
+    glViewport(0, 0, m_textureWidth, m_textureHeight);
+
+    // Clear with transparent background
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+    // Only render if UI should be visible
+    if (m_uiState.showMicrophone) {
+        RenderMicrophoneVisual();
+    }
+
+    if (m_uiState.showControls) {
+        RenderSimpleControls();
+        RenderRecordingStatus();
+    }
+
+    if (m_uiState.showLevelMeter) {
+        RenderAudioLevelMeter();
+    }
+
+    if (m_debugMode) {
+        RenderDebugInfo();
+    }
+
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+}
+
+void AudioRoutingOverlay::RenderMicrophoneVisual() {
+    // Simple microphone representation using basic OpenGL shapes
+    // Color coding: White when inactive, Green when recording, Yellow when monitoring
+    Vec3 micColor = m_virtualMic.isActive ? Vec3{0, 1, 0} : Vec3{0.8f, 0.8f, 0.8f};
+    if (m_uiState.monitoring) micColor = Vec3{1, 1, 0};  // Yellow when monitoring
+
+    // Enable depth testing for proper 3D rendering
+    glEnable(GL_DEPTH_TEST);
+
+    // Set microphone color
+    glColor3f(micColor.x, micColor.y, micColor.z);
+
+    // Save current matrix state
+    glPushMatrix();
+
+    // Translate to microphone position (relative to overlay coordinate system)
+    // Convert world mic position to overlay-relative position
+    float relativeX = m_virtualMic.position.x - m_position.x;
+    float relativeY = m_virtualMic.position.y - m_position.y;
+    float relativeZ = m_virtualMic.position.z - m_position.z;
+
+    glTranslatef(relativeX * 100.0f, relativeY * 100.0f, relativeZ * 100.0f);  // Scale for overlay space
+
+    // Render simple microphone shape using basic OpenGL primitives
+    // Main microphone body (cylinder approximation using quad strip)
+    glBegin(GL_QUAD_STRIP);
+    for (int i = 0; i <= 8; i++) {
+        float angle = (float)i * PI / 4.0f;
+        float x = cos(angle) * MIC_VISUAL_SIZE;
+        float z = sin(angle) * MIC_VISUAL_SIZE;
+
+        glVertex3f(x, -MIC_VISUAL_SIZE, z);  // Bottom
+        glVertex3f(x, MIC_VISUAL_SIZE, z);   // Top
+    }
+    glEnd();
+
+    // Microphone grille (top cap)
+    glBegin(GL_TRIANGLE_FAN);
+    glVertex3f(0, MIC_VISUAL_SIZE, 0);  // Center top
+    for (int i = 0; i <= 8; i++) {
+        float angle = (float)i * PI / 4.0f;
+        float x = cos(angle) * MIC_VISUAL_SIZE;
+        float z = sin(angle) * MIC_VISUAL_SIZE;
+        glVertex3f(x, MIC_VISUAL_SIZE, z);
+    }
+    glEnd();
+
+    // Recording indicator (pulsing effect when active)
+    if (m_virtualMic.isActive) {
+        float pulse = 1.0f + 0.3f * sin(std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count() * 0.01f);
+
+        glScalef(pulse, pulse, pulse);
+        glColor3f(1.0f, 0.2f, 0.2f);  // Red pulse
+
+        // Small pulsing sphere around mic
+        glBegin(GL_TRIANGLE_STRIP);
+        for (int i = 0; i <= 16; i++) {
+            float angle = (float)i * PI / 8.0f;
+            float x = cos(angle) * MIC_VISUAL_SIZE * 1.5f;
+            float y = sin(angle) * MIC_VISUAL_SIZE * 1.5f;
+            glVertex3f(x, y, 0);
+            glVertex3f(x, y, MIC_VISUAL_SIZE * 0.5f);
+        }
+        glEnd();
+    }
+
+    // Restore matrix state
+    glPopMatrix();
+
+    // Reset color to white
+    glColor3f(1.0f, 1.0f, 1.0f);
+
+    LOG_DEBUG("Rendered microphone visual at relative position ({:.2f}, {:.2f}, {:.2f}) with color ({:.1f}, {:.1f}, {:.1f})",
+              relativeX, relativeY, relativeZ, micColor.x, micColor.y, micColor.z);
+}
+
+void AudioRoutingOverlay::RenderRecordingStatus() {
+    // Creative solution: Simple OpenGL-based recording indicator
+    if (m_isRecording.load()) {
+        glPushMatrix();
+
+        // Position indicator in top-left of overlay
+        glTranslatef(-350.0f, 300.0f, 0.0f);
+
+        // Pulsing red "REC" indicator - creative visual feedback!
+        float pulse = 1.0f + 0.5f * sin(std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now().time_since_epoch()).count() * 0.01f);
+
+        glColor3f(pulse, 0.0f, 0.0f);  // Pulsing red
+
+        // Draw "REC" using simple rectangles - creative ASCII art approach!
+        // R shape
+        glBegin(GL_QUADS);
+        glVertex2f(0, 0); glVertex2f(15, 0); glVertex2f(15, 30); glVertex2f(0, 30);  // Vertical
+        glVertex2f(0, 30); glVertex2f(30, 30); glVertex2f(30, 25); glVertex2f(0, 25); // Top horizontal
+        glVertex2f(0, 15); glVertex2f(25, 15); glVertex2f(25, 10); glVertex2f(0, 10); // Middle horizontal
+        glEnd();
+
+        // E shape
+        glTranslatef(40.0f, 0.0f, 0.0f);
+        glBegin(GL_QUADS);
+        glVertex2f(0, 0); glVertex2f(15, 0); glVertex2f(15, 30); glVertex2f(0, 30);    // Vertical
+        glVertex2f(0, 30); glVertex2f(30, 30); glVertex2f(30, 25); glVertex2f(0, 25); // Top
+        glVertex2f(0, 15); glVertex2f(25, 15); glVertex2f(25, 10); glVertex2f(0, 10); // Middle
+        glVertex2f(0, 5); glVertex2f(30, 5); glVertex2f(30, 0); glVertex2f(0, 0);     // Bottom
+        glEnd();
+
+        // C shape
+        glTranslatef(40.0f, 0.0f, 0.0f);
+        glBegin(GL_QUADS);
+        glVertex2f(0, 5); glVertex2f(15, 5); glVertex2f(15, 25); glVertex2f(0, 25);   // Vertical
+        glVertex2f(0, 25); glVertex2f(30, 25); glVertex2f(30, 30); glVertex2f(0, 30); // Top
+        glVertex2f(0, 0); glVertex2f(30, 0); glVertex2f(30, 5); glVertex2f(0, 5);     // Bottom
+        glEnd();
+
+        glPopMatrix();
+
+        LOG_DEBUG("Rendered pulsing REC indicator with pulse factor {:.2f}", pulse);
+    }
+
+    // Reset color
+    glColor3f(1.0f, 1.0f, 1.0f);
+}
+
+void AudioRoutingOverlay::RenderSimpleControls() {
+    // Creative solution: Simple 3D buttons that ASMRtists can trigger press with controllers!
+
+    glPushMatrix();
+
+    // Position controls below microphone at comfortable reach
+    glTranslatef(0.0f, -200.0f, 0.0f);
+
+    // Record/Stop button - biggest and most important
+    bool nearRecordButton = IsControllerNearPosition(Vec3{0, -2.0f, -1.0f}, 0.3f);
+
+    glPushMatrix();
+    glTranslatef(-100.0f, 0.0f, 0.0f);
+
+    // Button color based on state and controller proximity
+    if (m_isRecording.load()) {
+        glColor3f(1.0f, 0.2f, 0.2f);  // Red when recording
+    } else if (nearRecordButton) {
+        glColor3f(0.2f, 1.0f, 0.2f);  // Bright green when controller nearby
+    } else {
+        glColor3f(0.5f, 0.8f, 0.5f);  // Dim green normally
+    }
+
+    // Draw 3D button using creative cube approach
+    float buttonSize = nearRecordButton ? 35.0f : 30.0f;  // Grows when controller near
+    glBegin(GL_QUADS);
+    // Front face
+    glVertex3f(-buttonSize, -buttonSize, buttonSize);
+    glVertex3f(buttonSize, -buttonSize, buttonSize);
+    glVertex3f(buttonSize, buttonSize, buttonSize);
+    glVertex3f(-buttonSize, buttonSize, buttonSize);
+    // Back face
+    glVertex3f(-buttonSize, -buttonSize, -buttonSize);
+    glVertex3f(-buttonSize, buttonSize, -buttonSize);
+    glVertex3f(buttonSize, buttonSize, -buttonSize);
+    glVertex3f(buttonSize, -buttonSize, -buttonSize);
+    glEnd();
+
+    // Check for button press - creative trigger detection!
+    if (nearRecordButton && (m_leftController.triggerPressed || m_rightController.triggerPressed)) {
+        if (!m_recordButtonPressed) {
+            m_recordButtonPressed = true;
+            ToggleRecording();  // This will call StartRecording() or StopRecording()
+            LOG_INFO("ASMRtist {} recording via VR button!", m_isRecording.load() ? "started" : "stopped");
+        }
+    } else {
+        m_recordButtonPressed = false;
+    }
+
+    glPopMatrix();
+
+    // Monitoring toggle button
+    bool nearMonitorButton = IsControllerNearPosition(Vec3{1.0f, -2.0f, -1.0f}, 0.3f);
+
+    glPushMatrix();
+    glTranslatef(100.0f, 0.0f, 0.0f);
+
+    if (m_uiState.monitoring) {
+        glColor3f(1.0f, 1.0f, 0.0f);  // Yellow when monitoring
+    } else if (nearMonitorButton) {
+        glColor3f(0.8f, 0.8f, 1.0f);  // Light blue when controller nearby
+    } else {
+        glColor3f(0.4f, 0.4f, 0.6f);  // Dim blue normally
+    }
+
+    float monitorSize = nearMonitorButton ? 25.0f : 20.0f;
+    glBegin(GL_QUADS);
+    // Simple speaker icon using rectangles
+    glVertex3f(-monitorSize, -monitorSize, 0);
+    glVertex3f(-monitorSize/2, -monitorSize, 0);
+    glVertex3f(-monitorSize/2, monitorSize, 0);
+    glVertex3f(-monitorSize, monitorSize, 0);
+
+    glVertex3f(-monitorSize/2, -monitorSize/2, 0);
+    glVertex3f(monitorSize/2, -monitorSize/2, 0);
+    glVertex3f(monitorSize/2, monitorSize/2, 0);
+    glVertex3f(-monitorSize/2, monitorSize/2, 0);
+    glEnd();
+
+    // Check for monitor button press
+    if (nearMonitorButton && (m_leftController.triggerPressed || m_rightController.triggerPressed)) {
+        if (!m_monitorButtonPressed) {
+            m_monitorButtonPressed = true;
+            SetMonitoring(!m_uiState.monitoring);
+            LOG_INFO("ASMRtist {} monitoring via VR button!", m_uiState.monitoring ? "enabled" : "disabled");
+        }
+    } else {
+        m_monitorButtonPressed = false;
+    }
+
+    glPopMatrix();
+    glPopMatrix();
+
+    // Reset color
+    glColor3f(1.0f, 1.0f, 1.0f);
+
+    LOG_DEBUG("Rendered VR controls - Record button near: {}, Monitor button near: {}", nearRecordButton, nearMonitorButton);
+}
+
+void AudioRoutingOverlay::RenderAudioLevelMeter() {
+    // Creative solution: Real-time audio level bars that ASMRtists can see while recording!
+
+    float inputLevel = GetInputLevel();
+    float outputLevel = GetSpatializedOutputLevel();
+
+    glPushMatrix();
+
+    // Position meters at top-right of overlay
+    glTranslatef(200.0f, 250.0f, 0.0f);
+
+    // Input level meter (left side)
+    glPushMatrix();
+    glTranslatef(-50.0f, 0.0f, 0.0f);
+
+    // Background bar
+    glColor3f(0.2f, 0.2f, 0.2f);
+    glBegin(GL_QUADS);
+    glVertex2f(0, 0); glVertex2f(20, 0); glVertex2f(20, 200); glVertex2f(0, 200);
+    glEnd();
+
+    // Input level fill - green to red gradient based on level
+    float levelHeight = inputLevel * 200.0f;
+    float greenComponent = std::max(0.0f, 1.0f - inputLevel * 2.0f);  // Fade out green as level increases
+    float redComponent = std::min(1.0f, inputLevel * 2.0f);           // Fade in red as level increases
+
+    glColor3f(redComponent, greenComponent, 0.0f);
+    glBegin(GL_QUADS);
+    glVertex2f(2, 2); glVertex2f(18, 2); glVertex2f(18, 2 + levelHeight); glVertex2f(2, 2 + levelHeight);
+    glEnd();
+
+    // Peak indicator - creative white line at peak level
+    static float peakLevel = 0.0f;
+    static auto lastPeakTime = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+
+    if (inputLevel > peakLevel) {
+        peakLevel = inputLevel;
+        lastPeakTime = now;
+    } else if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastPeakTime).count() > 500) {
+        peakLevel = std::max(0.0f, peakLevel - 0.01f);  // Slow decay
+    }
+
+    if (peakLevel > 0.01f) {
+        glColor3f(1.0f, 1.0f, 1.0f);
+        float peakY = 2 + peakLevel * 200.0f;
+        glBegin(GL_LINES);
+        glVertex2f(0, peakY); glVertex2f(20, peakY);
+        glEnd();
+    }
+
+    glPopMatrix();
+
+    // Output level meter (right side) - shows spatialized result
+    glPushMatrix();
+    glTranslatef(50.0f, 0.0f, 0.0f);
+
+    // Background bar
+    glColor3f(0.2f, 0.2f, 0.2f);
+    glBegin(GL_QUADS);
+    glVertex2f(0, 0); glVertex2f(20, 0); glVertex2f(20, 200); glVertex2f(0, 200);
+    glEnd();
+
+    // Output level fill - blue to cyan for spatial output
+    float outputHeight = outputLevel * 200.0f;
+    glColor3f(0.0f, 0.5f + outputLevel * 0.5f, 1.0f);
+    glBegin(GL_QUADS);
+    glVertex2f(2, 2); glVertex2f(18, 2); glVertex2f(18, 2 + outputHeight); glVertex2f(2, 2 + outputHeight);
+    glEnd();
+
+    glPopMatrix();
+
+    // Labels using simple line art
+    glColor3f(0.8f, 0.8f, 0.8f);
+
+    // "IN" label (left meter)
+    glPushMatrix();
+    glTranslatef(-55.0f, -25.0f, 0.0f);
+    glBegin(GL_LINES);
+    // I
+    glVertex2f(0, 0); glVertex2f(0, 10);
+    glVertex2f(-2, 0); glVertex2f(2, 0);
+    glVertex2f(-2, 10); glVertex2f(2, 10);
+    // N
+    glVertex2f(5, 0); glVertex2f(5, 10);
+    glVertex2f(5, 10); glVertex2f(10, 0);
+    glVertex2f(10, 0); glVertex2f(10, 10);
+    glEnd();
+    glPopMatrix();
+
+    // "OUT" label (right meter)
+    glPushMatrix();
+    glTranslatef(45.0f, -25.0f, 0.0f);
+    glBegin(GL_LINES);
+    // O
+    glVertex2f(0, 0); glVertex2f(0, 10);
+    glVertex2f(0, 10); glVertex2f(5, 10);
+    glVertex2f(5, 10); glVertex2f(5, 0);
+    glVertex2f(5, 0); glVertex2f(0, 0);
+    // U
+    glVertex2f(7, 10); glVertex2f(7, 2);
+    glVertex2f(7, 2); glVertex2f(12, 2);
+    glVertex2f(12, 2); glVertex2f(12, 10);
+    // T
+    glVertex2f(14, 10); glVertex2f(19, 10);
+    glVertex2f(16.5f, 10); glVertex2f(16.5f, 0);
+    glEnd();
+    glPopMatrix();
+
+    glPopMatrix();
+
+    // Reset color
+    glColor3f(1.0f, 1.0f, 1.0f);
+
+    LOG_DEBUG("Rendered audio meters - Input: {:.2f}, Output: {:.2f}, Peak: {:.2f}", inputLevel, outputLevel, peakLevel);
+}
+
+// === HELPER FUNCTIONS ===
+
+void AudioRoutingOverlay::UpdateAudioLevels() {
+    // Get audio levels from audio engine
+    if (m_audioEngine) {
+        m_inputLevel = m_audioEngine->GetInputLevel();
+        // Calculate spatialized output level
+        m_outputLevel = (m_audioEngine->GetOutputLevelLeft() + m_audioEngine->GetOutputLevelRight()) * 0.5f;
+    }
+}
+
+void AudioRoutingOverlay::HandleAutoHide() {
+    if (!m_uiState.autoHide) return;
+
+    auto now = std::chrono::steady_clock::now();
+    auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - m_uiState.lastInteraction).count();
+
+    // Hide UI after delay, but keep visible during recording
+    if (elapsed > m_uiState.autoHideDelayMs && !m_isRecording.load()) {
+        m_uiState.showControls = false;
+        m_uiState.showLevelMeter = false;
+    } else if (elapsed < 100) {  // Show UI when there's recent interaction
+        m_uiState.showControls = true;
+        m_uiState.showLevelMeter = true;
+    }
+}
+
+float AudioRoutingOverlay::CalculateDistance(const Vec3& a, const Vec3& b) {
+    float dx = a.x - b.x;
+    float dy = a.y - b.y;
+    float dz = a.z - b.z;
+    return std::sqrt(dx*dx + dy*dy + dz*dz);
+}
+
+bool AudioRoutingOverlay::IsControllerNearMicrophone(const Vec3& controllerPos, float tolerance) {
+    return CalculateDistance(controllerPos, m_virtualMic.position) <= tolerance;
+}
+
+void AudioRoutingOverlay::SetHRTFProcessor(HRTFProcessor* processor) {
+    m_hrtfProcessor = processor;
+
+    // Update processor with current microphone position
+    if (processor) {
+        processor->SetListenerPosition(m_virtualMic.position);
+        processor->SetListenerOrientation(m_virtualMic.orientation);
+    }
+}
+
+void AudioRoutingOverlay::SetVisible(bool visible) {
+    m_visible = visible;
+    if (visible) {
+        m_uiState.lastInteraction = std::chrono::steady_clock::now();
+    }
+}
+
+// === STUB IMPLEMENTATIONS FOR VR OVERLAY ===
+
 bool AudioRoutingOverlay::CreateOverlay() {
-    if (!vr::VROverlay()) {
-        LOG_ERROR("VROverlay system not available - no VR audio magic for you!");
+    LOG_INFO("Creating real OpenVR overlay for ASMRtist microphone positioning");
+
+    // Check if OpenVR is available
+    if (!vr::VRSystem()) {
+        LOG_ERROR("OpenVR system not initialized - cannot create overlay");
         return false;
     }
 
-    // Create the main overlay - our beautiful Audio Cockpit!
-    vr::EVROverlayError overlayError = vr::VROverlay()->CreateOverlay(
-        "vrb.audio_routing_cockpit",
-        "VR Audio Cockpit",
-        &m_overlayHandle
-    );
-
+    // Create the main overlay for microphone positioning UI
+    vr::EVROverlayError overlayError = vr::VROverlay()->CreateOverlay("vrb.asmr.mic_position", "ASMR Microphone", &m_overlayHandle);
     if (overlayError != vr::VROverlayError_None) {
-        LOG_ERROR("Failed to create overlay: {}", (int)overlayError);
+        LOG_ERROR("Failed to create OpenVR overlay: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(overlayError));
         return false;
     }
 
-    // Set up overlay properties for maximum awesomeness
-    vr::VROverlay()->SetOverlayWidthInMeters(m_overlayHandle, 2.0f);  // Nice and big!
-    vr::VROverlay()->SetOverlayFlag(m_overlayHandle, vr::VROverlayFlags_SideBySide_Parallel, false);
-    vr::VROverlay()->SetOverlayFlag(m_overlayHandle, vr::VROverlayFlags_NoDashboardTab, true);
-    vr::VROverlay()->SetOverlayAlpha(m_overlayHandle, 0.9f);  // Slightly transparent for coolness
+    // Configure overlay properties for ASMRtist workflow
+    vr::VROverlay()->SetOverlayWidthInMeters(m_overlayHandle, 0.8f);  // 80cm wide UI panel
+    vr::VROverlay()->SetOverlayAlpha(m_overlayHandle, 0.9f);          // Slightly transparent
+    vr::VROverlay()->SetOverlayColor(m_overlayHandle, 1.0f, 1.0f, 1.0f);  // White base color
 
-    // Enable input capture for gesture recognition
-    vr::VROverlay()->SetOverlayFlag(m_overlayHandle, vr::VROverlayFlags_SendVRSmoothScrollEvents, true);
-    vr::VROverlay()->SetOverlayFlag(m_overlayHandle, vr::VROverlayFlags_SendVRTouchpadEvents, true);
+    // Position overlay in front of user at comfortable distance
+    vr::HmdMatrix34_t overlayTransform = {};
+    overlayTransform.m[0][0] = 1.0f;
+    overlayTransform.m[1][1] = 1.0f;
+    overlayTransform.m[2][2] = 1.0f;
+    overlayTransform.m[0][3] = m_position.x;
+    overlayTransform.m[1][3] = m_position.y;
+    overlayTransform.m[2][3] = m_position.z;
 
-    LOG_INFO("SteamVR overlay created successfully - Audio Cockpit ready for display!");
+    vr::EVROverlayError transformError = vr::VROverlay()->SetOverlayTransformAbsolute(m_overlayHandle, vr::TrackingUniverseStanding, &overlayTransform);
+    if (transformError != vr::VROverlayError_None) {
+        LOG_WARN("Failed to set overlay transform: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(transformError));
+        // Continue anyway - transform can be updated later
+    }
+
+    // Create thumbnail overlay for dashboard
+    vr::EVROverlayError thumbError = vr::VROverlay()->CreateOverlay("vrb.asmr.mic_thumb", "ASMR Mic Thumb", &m_thumbnailHandle);
+    if (thumbError != vr::VROverlayError_None) {
+        LOG_WARN("Failed to create thumbnail overlay: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(thumbError));
+        // Thumbnail is optional - continue without it
+        m_thumbnailHandle = vr::k_ulOverlayHandleInvalid;
+    } else {
+        // Set thumbnail properties
+        vr::VROverlay()->SetOverlayWidthInMeters(m_thumbnailHandle, 0.15f);  // Small thumbnail
+    }
+
+    LOG_INFO("✅ Real OpenVR overlay created successfully!");
+    LOG_DEBUG("  - Main overlay handle: {}", m_overlayHandle);
+    LOG_DEBUG("  - Thumbnail handle: {}", m_thumbnailHandle);
+    LOG_DEBUG("  - Position: ({}, {}, {})", m_position.x, m_position.y, m_position.z);
+
     return true;
 }
 
 void AudioRoutingOverlay::DestroyOverlay() {
+    LOG_DEBUG("Destroying OpenVR overlay resources");
+
+    // Clean up thumbnail overlay
+    if (m_thumbnailHandle != vr::k_ulOverlayHandleInvalid) {
+        vr::EVROverlayError thumbError = vr::VROverlay()->DestroyOverlay(m_thumbnailHandle);
+        if (thumbError != vr::VROverlayError_None) {
+            LOG_WARN("Failed to destroy thumbnail overlay: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(thumbError));
+        } else {
+            LOG_DEBUG("  - Destroyed thumbnail overlay");
+        }
+        m_thumbnailHandle = vr::k_ulOverlayHandleInvalid;
+    }
+
+    // Clean up main overlay
     if (m_overlayHandle != vr::k_ulOverlayHandleInvalid) {
-        vr::VROverlay()->DestroyOverlay(m_overlayHandle);
+        vr::EVROverlayError overlayError = vr::VROverlay()->DestroyOverlay(m_overlayHandle);
+        if (overlayError != vr::VROverlayError_None) {
+            LOG_WARN("Failed to destroy main overlay: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(overlayError));
+        } else {
+            LOG_DEBUG("  - Destroyed main overlay");
+        }
         m_overlayHandle = vr::k_ulOverlayHandleInvalid;
     }
 
-    if (m_thumbnailHandle != vr::k_ulOverlayHandleInvalid) {
-        vr::VROverlay()->DestroyOverlay(m_thumbnailHandle);
-        m_thumbnailHandle = vr::k_ulOverlayHandleInvalid;
-    }
+    LOG_INFO("✅ OpenVR overlay cleanup complete - no VR resource leaks!");
 }
 
-// === OPENGL RENDER TARGET MAGIC ===
 bool AudioRoutingOverlay::CreateRenderTarget() {
-    // Create framebuffer for rendering our beautiful UI
+    LOG_INFO("Creating real OpenGL render target {}x{}", m_textureWidth, m_textureHeight);
+
+    // Generate framebuffer object
     glGenFramebuffers(1, &m_framebuffer);
+    if (m_framebuffer == 0) {
+        LOG_ERROR("Failed to generate OpenGL framebuffer");
+        return false;
+    }
     glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
 
-    // Create color texture
+    // Create color texture for rendering
     glGenTextures(1, &m_colorTexture);
     glBindTexture(GL_TEXTURE_2D, m_colorTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, m_textureWidth, m_textureHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_colorTexture, 0);
 
-    // Create depth texture for 3D coolness
+    // Create depth texture for proper 3D rendering
     glGenTextures(1, &m_depthTexture);
     glBindTexture(GL_TEXTURE_2D, m_depthTexture);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, m_textureWidth, m_textureHeight, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
@@ -216,472 +775,226 @@ bool AudioRoutingOverlay::CreateRenderTarget() {
     // Check framebuffer completeness
     GLenum status = glCheckFramebufferStatus(GL_FRAMEBUFFER);
     if (status != GL_FRAMEBUFFER_COMPLETE) {
-        LOG_ERROR("Framebuffer not complete: {}", (int)status);
-        DestroyRenderTarget();
+        LOG_ERROR("OpenGL framebuffer incomplete! Status: 0x{:X}", status);
+        DestroyRenderTarget();  // Clean up partial resources
         return false;
     }
 
+    // Unbind framebuffer to restore default
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    LOG_INFO("OpenGL render target created - ready for beautiful visuals!");
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    LOG_INFO("✅ Real OpenGL render target created successfully!");
+    LOG_DEBUG("  - Framebuffer ID: {}", m_framebuffer);
+    LOG_DEBUG("  - Color texture ID: {}", m_colorTexture);
+    LOG_DEBUG("  - Depth texture ID: {}", m_depthTexture);
+
     return true;
 }
 
 void AudioRoutingOverlay::DestroyRenderTarget() {
-    if (m_framebuffer != 0) {
-        glDeleteFramebuffers(1, &m_framebuffer);
-        m_framebuffer = 0;
-    }
-    if (m_colorTexture != 0) {
-        glDeleteTextures(1, &m_colorTexture);
-        m_colorTexture = 0;
-    }
+    LOG_DEBUG("Destroying OpenGL render target resources");
+
+    // Clean up depth texture
     if (m_depthTexture != 0) {
         glDeleteTextures(1, &m_depthTexture);
         m_depthTexture = 0;
-    }
-}
-
-// === GESTURE RECOGNITION MAGIC ===
-void AudioRoutingOverlay::UpdateControllerStates() {
-    if (!vr::VRSystem()) return;
-
-    // Find controller indices if we haven't already
-    if (m_leftControllerIndex == vr::k_unTrackedDeviceIndexInvalid ||
-        m_rightControllerIndex == vr::k_unTrackedDeviceIndexInvalid) {
-
-        for (uint32_t i = 0; i < vr::k_unMaxTrackedDeviceCount; ++i) {
-            if (vr::VRSystem()->GetTrackedDeviceClass(i) == vr::TrackedDeviceClass_Controller) {
-                auto role = vr::VRSystem()->GetControllerRoleForTrackedDeviceIndex(i);
-                if (role == vr::TrackedControllerRole_LeftHand) {
-                    m_leftControllerIndex = i;
-                } else if (role == vr::TrackedControllerRole_RightHand) {
-                    m_rightControllerIndex = i;
-                }
-            }
-        }
+        LOG_DEBUG("  - Deleted depth texture");
     }
 
-    // Update left controller state
-    if (m_leftControllerIndex != vr::k_unTrackedDeviceIndexInvalid) {
-        vr::VRControllerState_t controllerState;
-        vr::TrackedDevicePose_t pose;
-
-        if (vr::VRSystem()->GetControllerStateWithPose(vr::TrackingUniverseStanding,
-                                                      m_leftControllerIndex,
-                                                      &controllerState,
-                                                      sizeof(controllerState),
-                                                      &pose)) {
-            // Extract position from pose matrix for now (simplified)
-            Vec3 controllerPos{pose.mDeviceToAbsoluteTracking.m[0][3],
-                               pose.mDeviceToAbsoluteTracking.m[1][3],
-                               pose.mDeviceToAbsoluteTracking.m[2][3]};
-            m_leftController.position = ControllerToWorldSpace(controllerPos, m_leftControllerIndex);
-            m_leftController.trigger = controllerState.rAxis[1][0];  // Trigger axis
-            m_leftController.wasGripping = m_leftController.isGripping;
-            m_leftController.isGripping = m_leftController.trigger > 0.5f;
-        }
+    // Clean up color texture
+    if (m_colorTexture != 0) {
+        glDeleteTextures(1, &m_colorTexture);
+        m_colorTexture = 0;
+        LOG_DEBUG("  - Deleted color texture");
     }
 
-    // Update right controller state (similar logic)
-    if (m_rightControllerIndex != vr::k_unTrackedDeviceIndexInvalid) {
-        vr::VRControllerState_t controllerState;
-        vr::TrackedDevicePose_t pose;
-
-        if (vr::VRSystem()->GetControllerStateWithPose(vr::TrackingUniverseStanding,
-                                                      m_rightControllerIndex,
-                                                      &controllerState,
-                                                      sizeof(controllerState),
-                                                      &pose)) {
-            // Extract position from pose matrix for now (simplified)
-            Vec3 controllerPos{pose.mDeviceToAbsoluteTracking.m[0][3],
-                               pose.mDeviceToAbsoluteTracking.m[1][3],
-                               pose.mDeviceToAbsoluteTracking.m[2][3]};
-            m_rightController.position = ControllerToWorldSpace(controllerPos, m_rightControllerIndex);
-            m_rightController.trigger = controllerState.rAxis[1][0];
-            m_rightController.wasGripping = m_rightController.isGripping;
-            m_rightController.isGripping = m_rightController.trigger > 0.5f;
-        }
-    }
-}
-
-void AudioRoutingOverlay::ProcessGestures() {
-    // Process pinch gestures for grabbing audio orbs
-    DetectPinchGesture(m_leftController);
-    DetectPinchGesture(m_rightController);
-
-    // Process swipe gestures for quick actions
-    DetectSwipeGesture(m_leftController);
-    DetectSwipeGesture(m_rightController);
-
-    // Process twist gestures for parameter adjustment
-    DetectTwistGesture(m_leftController);
-    DetectTwistGesture(m_rightController);
-
-    // Process clap gesture for global mute/unmute
-    DetectClapGesture();
-}
-
-void AudioRoutingOverlay::DetectPinchGesture(ControllerState& controller) {
-    // Check if controller just started gripping
-    if (controller.isGripping && !controller.wasGripping) {
-        // Look for audio orbs near the controller
-        AudioSource* nearbyOrb = GetOrbAtPosition(controller.position, GRAB_DISTANCE);
-        if (nearbyOrb) {
-            controller.grabbedSource = nearbyOrb;
-            HandleOrbGrab(nearbyOrb, controller.position);
-
-            // Notify gesture callbacks
-            for (auto& callback : m_gestureCallbacks) {
-                callback("pinch_start", controller.position);
-            }
-        }
-    }
-    // Check if controller just stopped gripping
-    else if (!controller.isGripping && controller.wasGripping) {
-        if (controller.grabbedSource) {
-            HandleOrbRelease(controller.grabbedSource);
-            controller.grabbedSource = nullptr;
-
-            for (auto& callback : m_gestureCallbacks) {
-                callback("pinch_end", controller.position);
-            }
-        }
-    }
-    // If currently grabbing, update orb position
-    else if (controller.isGripping && controller.grabbedSource) {
-        controller.grabbedSource->orbPosition = controller.position;
-    }
-}
-
-// === AUDIO ORB MANAGEMENT ===
-void AudioRoutingOverlay::UpdateAudioOrbs() {
-    for (auto& [name, source] : m_audioSources) {
-        // Update orb size based on audio level (fake it for now!)
-        // TODO: Get real audio levels from AudioEngine
-        float fakeAudioLevel = 0.5f + 0.5f * std::sin(m_uiState.pulseTimer * 2.0f +
-                                                      std::hash<std::string>{}(name) % 100);
-        source->orbSize = AUDIO_ORB_BASE_SIZE + (AUDIO_ORB_MAX_SIZE - AUDIO_ORB_BASE_SIZE) * fakeAudioLevel;
-
-        // Update orb color based on frequency content (also fake for now!)
-        float hue = (std::hash<std::string>{}(name) % 360) / 360.0f;
-        source->orbColor = HSVToRGB(hue, 0.8f, 0.8f + 0.2f * fakeAudioLevel);
-
-        // Pulse animation
-        source->orbPulse = std::sin(m_uiState.pulseTimer * 4.0f) * 0.1f;
+    // Clean up framebuffer
+    if (m_framebuffer != 0) {
+        glDeleteFramebuffers(1, &m_framebuffer);
+        m_framebuffer = 0;
+        LOG_DEBUG("  - Deleted framebuffer");
     }
 
-    m_uiState.pulseTimer += 0.016f;  // Assuming ~60 FPS
-}
-
-AudioRoutingOverlay::AudioSource* AudioRoutingOverlay::GetOrbAtPosition(const Vec3& position, float tolerance) {
-    for (auto& [name, source] : m_audioSources) {
-        float distance = CalculateDistance(position, source->orbPosition);
-        if (distance <= tolerance) {
-            return source.get();
-        }
-    }
-    return nullptr;
-}
-
-void AudioRoutingOverlay::HandleOrbGrab(AudioSource* source, const Vec3& controllerPos) {
-    LOG_INFO("Grabbed audio orb: {}", source->name);
-    // TODO: Add haptic feedback
-    // TODO: Notify audio engine about orb interaction
-}
-
-void AudioRoutingOverlay::HandleOrbRelease(AudioSource* source) {
-    LOG_INFO("Released audio orb: {}", source->name);
-    // TODO: Apply spatial position to audio engine
-    // TODO: Add haptic feedback
-}
-
-// === CREATIVE SHORTCUTS & INITIALIZATION ===
-void AudioRoutingOverlay::InitializePresets() {
-    m_hrtfPresets[AudioPreset::CINEMA] = {
-        .roomSize = 15.0f,
-        .reverbMix = 0.3f,
-        .distanceAttenuation = 1.2f,
-        .nearFieldCompensation = true,
-        .displayName = "Cinema Experience"
-    };
-
-    m_hrtfPresets[AudioPreset::CONCERT] = {
-        .roomSize = 50.0f,
-        .reverbMix = 0.6f,
-        .distanceAttenuation = 1.5f,
-        .nearFieldCompensation = false,
-        .displayName = "Live Concert"
-    };
-
-    m_hrtfPresets[AudioPreset::PODCAST] = {
-        .roomSize = 5.0f,
-        .reverbMix = 0.1f,
-        .distanceAttenuation = 0.8f,
-        .nearFieldCompensation = true,
-        .displayName = "Intimate Voice"
-    };
-
-    m_hrtfPresets[AudioPreset::GAMING] = {
-        .roomSize = 10.0f,
-        .reverbMix = 0.2f,
-        .distanceAttenuation = 1.0f,
-        .nearFieldCompensation = true,
-        .displayName = "Competitive Gaming"
-    };
-
-    m_hrtfPresets[AudioPreset::MUSIC] = {
-        .roomSize = 20.0f,
-        .reverbMix = 0.25f,
-        .distanceAttenuation = 1.1f,
-        .nearFieldCompensation = true,
-        .displayName = "Hi-Fi Listening"
-    };
-
-    LOG_INFO("Initialized {} HRTF presets for instant audio magic!", m_hrtfPresets.size());
-}
-
-// === QUICK STUB IMPLEMENTATIONS ===
-// These are the "make it work" implementations - we'll polish later!
-
-void AudioRoutingOverlay::SetVisible(bool visible) {
-    m_visible = visible;
-    if (m_overlayHandle != vr::k_ulOverlayHandleInvalid) {
-        vr::VROverlay()->SetOverlayFlag(m_overlayHandle, vr::VROverlayFlags_HideLaserIntersection, !visible);
-    }
-}
-
-void AudioRoutingOverlay::SetPosition(const Vec3& position) {
-    m_position = position;
-    UpdateOverlayTransform();
-}
-
-void AudioRoutingOverlay::SetScale(float scale) {
-    m_scale = scale;
-    if (m_overlayHandle != vr::k_ulOverlayHandleInvalid) {
-        vr::VROverlay()->SetOverlayWidthInMeters(m_overlayHandle, 2.0f * scale);
-    }
-}
-
-void AudioRoutingOverlay::AddAudioSource(const std::string& name) {
-    auto source = std::make_unique<AudioSource>();
-    source->name = name;
-    m_audioSources[name] = std::move(source);
-    LOG_INFO("Added audio source: {}", name);
-}
-
-void AudioRoutingOverlay::RemoveAudioSource(const std::string& name) {
-    m_audioSources.erase(name);
-    LOG_INFO("Removed audio source: {}", name);
-}
-
-AudioRoutingOverlay::AudioSource* AudioRoutingOverlay::GetAudioSource(const std::string& name) {
-    auto it = m_audioSources.find(name);
-    return it != m_audioSources.end() ? it->second.get() : nullptr;
-}
-
-void AudioRoutingOverlay::ApplyPreset(AudioPreset preset) {
-    auto it = m_hrtfPresets.find(preset);
-    if (it != m_hrtfPresets.end()) {
-        const auto& presetData = it->second;
-        LOG_INFO("Applying preset: {}", presetData.displayName);
-
-        // TODO: Apply preset to audio engine
-        // m_audioEngine->SetRoomSize(presetData.roomSize);
-        // m_audioEngine->SetReverbMix(presetData.reverbMix);
-        // etc.
-
-        m_uiState.currentPreset = preset;
-    }
-}
-
-// === HELPER METHODS ===
-float AudioRoutingOverlay::CalculateDistance(const Vec3& a, const Vec3& b) {
-    float dx = a.x - b.x;
-    float dy = a.y - b.y;
-    float dz = a.z - b.z;
-    return std::sqrt(dx * dx + dy * dy + dz * dz);
-}
-
-Vec3 AudioRoutingOverlay::HSVToRGB(float h, float s, float v) {
-    // Quick HSV to RGB conversion for pretty colors!
-    float c = v * s;
-    float x = c * (1 - std::abs(std::fmod(h * 6, 2) - 1));
-    float m = v - c;
-
-    float r, g, b;
-    if (h < 1.0f/6.0f) { r = c; g = x; b = 0; }
-    else if (h < 2.0f/6.0f) { r = x; g = c; b = 0; }
-    else if (h < 3.0f/6.0f) { r = 0; g = c; b = x; }
-    else if (h < 4.0f/6.0f) { r = 0; g = x; b = c; }
-    else if (h < 5.0f/6.0f) { r = x; g = 0; b = c; }
-    else { r = c; g = 0; b = x; }
-
-    return {r + m, g + m, b + m};
-}
-
-Vec3 AudioRoutingOverlay::ControllerToWorldSpace(const Vec3& position, uint32_t deviceIndex) {
-    // Get controller pose and convert to world space
-    vr::TrackedDevicePose_t pose;
-    vr::VRSystem()->GetDeviceToAbsoluteTrackingPose(vr::TrackingUniverseStanding, 0, &pose, 1);
-
-    // Extract position from transformation matrix (simplified!)
-    return Vec3{
-        pose.mDeviceToAbsoluteTracking.m[0][3],
-        pose.mDeviceToAbsoluteTracking.m[1][3],
-        pose.mDeviceToAbsoluteTracking.m[2][3]
-    };
-}
-
-// === RENDERING STUBS ===
-// These are placeholder implementations - we'll make them beautiful later!
-
-void AudioRoutingOverlay::RenderToTexture() {
-    if (m_framebuffer == 0) return;
-
-    glBindFramebuffer(GL_FRAMEBUFFER, m_framebuffer);
-    glViewport(0, 0, m_textureWidth, m_textureHeight);
-
-    // Clear to a nice dark background
-    glClearColor(0.1f, 0.1f, 0.2f, 0.9f);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    // TODO: Render the beautiful Audio Cockpit UI here!
-    // For now, just render some debug info
-    if (m_debugMode) {
-        RenderDebugInfo();
-    }
-
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    LOG_INFO("✅ OpenGL render target cleanup complete - no resource leaks!");
 }
 
 void AudioRoutingOverlay::UpdateOverlayTexture() {
-    if (m_overlayHandle == vr::k_ulOverlayHandleInvalid || m_colorTexture == 0) return;
+    // Check if overlay exists
+    if (m_overlayHandle == vr::k_ulOverlayHandleInvalid) {
+        LOG_WARN("Cannot update texture - overlay not created");
+        return;
+    }
 
-    vr::Texture_t eyeTexture = { (void*)(uintptr_t)m_colorTexture, vr::TextureType_OpenGL, vr::ColorSpace_Gamma };
-    vr::VROverlay()->SetOverlayTexture(m_overlayHandle, &eyeTexture);
+    // Check if we have a valid color texture from rendering
+    if (m_colorTexture == 0) {
+        LOG_WARN("Cannot update texture - no color texture available");
+        return;
+    }
+
+    // Create OpenVR texture structure pointing to our OpenGL texture
+    vr::Texture_t eyeTexture = {};
+    eyeTexture.handle = reinterpret_cast<void*>(static_cast<uintptr_t>(m_colorTexture));
+    eyeTexture.eType = vr::TextureType_OpenGL;
+    eyeTexture.eColorSpace = vr::ColorSpace_Gamma;
+
+    // Set texture on the overlay
+    vr::EVROverlayError error = vr::VROverlay()->SetOverlayTexture(m_overlayHandle, &eyeTexture);
+    if (error != vr::VROverlayError_None) {
+        LOG_ERROR("Failed to set overlay texture: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(error));
+        return;
+    }
+
+    // Update thumbnail if it exists
+    if (m_thumbnailHandle != vr::k_ulOverlayHandleInvalid) {
+        vr::EVROverlayError thumbError = vr::VROverlay()->SetOverlayTexture(m_thumbnailHandle, &eyeTexture);
+        if (thumbError != vr::VROverlayError_None) {
+            LOG_DEBUG("Failed to set thumbnail texture: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(thumbError));
+            // Thumbnail failure is not critical
+        }
+    }
+
+    LOG_DEBUG("✅ OpenVR overlay texture updated with GL texture ID {}", m_colorTexture);
 }
 
 void AudioRoutingOverlay::UpdateOverlayTransform() {
-    if (m_overlayHandle == vr::k_ulOverlayHandleInvalid) return;
+    // Check if overlay exists
+    if (m_overlayHandle == vr::k_ulOverlayHandleInvalid) {
+        LOG_WARN("Cannot update transform - overlay not created");
+        return;
+    }
 
-    // Set overlay position in world space
-    m_overlayTransform.m[0][3] = m_position.x;
-    m_overlayTransform.m[1][3] = m_position.y;
-    m_overlayTransform.m[2][3] = m_position.z;
+    // Build transform matrix from current position and scale
+    vr::HmdMatrix34_t transform = {};
 
-    vr::VROverlay()->SetOverlayTransformAbsolute(m_overlayHandle, vr::TrackingUniverseStanding, &m_overlayTransform);
-}
+    // Set rotation matrix (identity for now - overlay faces forward)
+    transform.m[0][0] = m_scale;  // X scale
+    transform.m[1][1] = m_scale;  // Y scale
+    transform.m[2][2] = m_scale;  // Z scale
 
-// === MORE CREATIVE STUBS ===
-// These methods will be implemented as we iterate and refine!
+    // Set translation (position in VR space)
+    transform.m[0][3] = m_position.x;
+    transform.m[1][3] = m_position.y;
+    transform.m[2][3] = m_position.z;
 
-void AudioRoutingOverlay::DetectSwipeGesture(ControllerState& controller) {
-    // TODO: Implement swipe detection for quick actions
-}
+    // Apply transform to overlay in tracking universe
+    vr::EVROverlayError error = vr::VROverlay()->SetOverlayTransformAbsolute(
+        m_overlayHandle,
+        vr::TrackingUniverseStanding,
+        &transform
+    );
 
-void AudioRoutingOverlay::DetectTwistGesture(ControllerState& controller) {
-    // TODO: Implement twist detection for parameter adjustment
-}
+    if (error != vr::VROverlayError_None) {
+        LOG_ERROR("Failed to update overlay transform: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(error));
+        return;
+    }
 
-void AudioRoutingOverlay::DetectClapGesture() {
-    // TODO: Implement two-handed clap detection
-}
+    // Update overlay visibility based on current state
+    bool shouldBeVisible = m_visible.load() && (m_uiState.showControls || m_uiState.showMicrophone || m_isRecording.load());
 
-void AudioRoutingOverlay::UpdateParticleSystem() {
-    // TODO: Update beautiful particle visualization
-}
+    vr::EVROverlayError visError = vr::VROverlay()->SetOverlayFlag(
+        m_overlayHandle,
+        vr::VROverlayFlags_VisibleInDashboard,
+        shouldBeVisible
+    );
 
-void AudioRoutingOverlay::UpdateAudioVisualization() {
-    // TODO: Update real-time audio visualization data
-}
+    if (visError != vr::VROverlayError_None) {
+        LOG_DEBUG("Failed to set overlay visibility: {}", vr::VROverlay()->GetOverlayErrorNameFromEnum(visError));
+        // Non-critical error, continue
+    }
 
-void AudioRoutingOverlay::UpdateMetrics() {
-    // TODO: Update performance metrics
-}
-
-void AudioRoutingOverlay::HandleAutoHide() {
-    // TODO: Implement auto-hide functionality
-}
-
-void AudioRoutingOverlay::SyncToCompositor() {
-    // TODO: Sync timing to VR compositor for smooth rendering
-}
-
-void AudioRoutingOverlay::RegisterGestureCallback(GestureCallback callback) {
-    m_gestureCallbacks.push_back(callback);
-}
-
-void AudioRoutingOverlay::AttachToController(bool enabled) {
-    m_attachToController = enabled;
-    // TODO: Implement controller attachment
+    LOG_DEBUG("✅ Overlay transform updated - Position: ({:.2f}, {:.2f}, {:.2f}), Scale: {:.2f}, Visible: {}",
+              m_position.x, m_position.y, m_position.z, m_scale, shouldBeVisible);
 }
 
 void AudioRoutingOverlay::RenderDebugInfo() {
-    // TODO: Render debug information overlay
+    if (!m_debugMode) return;
+
+    LOG_DEBUG("Mic Position: ({}, {}, {})", m_virtualMic.position.x, m_virtualMic.position.y, m_virtualMic.position.z);
+    LOG_DEBUG("Recording: {}, Monitoring: {}", m_isRecording.load(), m_uiState.monitoring);
+    LOG_DEBUG("Input Level: {}, Output Level: {}", m_inputLevel.load(), m_outputLevel.load());
 }
 
-std::vector<AudioRoutingOverlay::AudioSource*> AudioRoutingOverlay::GetAllAudioSources() {
-    std::vector<AudioRoutingOverlay::AudioSource*> sources;
-    for (auto& [name, source] : m_audioSources) {
-        sources.push_back(source.get());
-    }
-    return sources;
-}
-
+// Gesture detection compatibility methods for AudioCockpit integration
 void AudioRoutingOverlay::UpdateGestureDetection(const std::vector<VRPose>& controllers) {
-    if (!m_initialized.load()) {
-        return;
-    }
-
-    // Update controller states from VR tracking data
-    // This integrates the Audio Cockpit with the 90Hz VR tracking thread
-    if (controllers.size() >= 1) {
-        m_leftController.position = controllers[0].position;
-        m_leftController.wasGripping = m_leftController.isGripping;
-        // Simple trigger detection based on controller validity for now
-        m_leftController.isGripping = controllers[0].isValid;
-    }
-
-    if (controllers.size() >= 2) {
-        m_rightController.position = controllers[1].position;
-        m_rightController.wasGripping = m_rightController.isGripping;
-        m_rightController.isGripping = controllers[1].isValid;
-    }
-
-    // Process gesture detection with updated controller states
-    ProcessGestures();
+    // Simple stub implementation - delegate to controller tracking
+    UpdateControllerTracking(controllers);
+    // TODO: Add actual gesture detection if needed for advanced features
 }
 
 void AudioRoutingOverlay::UpdateAudioOrbPositions(const VRPose& hmdPose) {
-    if (!m_initialized.load()) {
-        return;
-    }
-
-    // Update audio orb positions relative to HMD for spatial audio
-    // This creates a dynamic audio field around the user's head
-    float angle = 0.0f;
-    float radius = 0.5f; // Half meter circle around user
-
-    for (auto& [name, source] : m_audioSources) {
-        // Check if this source is currently grabbed by either controller
-        bool isGrabbed = (m_leftController.grabbedSource == source.get()) ||
-                        (m_rightController.grabbedSource == source.get());
-
-        if (!isGrabbed) { // Only update if not grabbed by user
-            // Position orbs in a circle around the HMD
-            source->orbPosition = Vec3{
-                hmdPose.position.x + std::sin(angle) * radius,
-                hmdPose.position.y, // Keep at head level
-                hmdPose.position.z + std::cos(angle) * radius
-            };
-        }
-        angle += TWO_PI / m_audioSources.size();
-    }
+    // Simple stub implementation - delegate to microphone tracking
+    UpdateMicrophoneTracking(hmdPose);
+    // TODO: Add orb visualization if needed for advanced features
 }
 
-void AudioRoutingOverlay::SetHRTFProcessor(HRTFProcessor* processor) {
-    m_hrtfProcessor = processor;
-    LOG_INFO("Audio Routing Overlay connected to HRTF processor - spatial audio magic enabled!");
+void AudioRoutingOverlay::RegisterGestureCallback(std::function<void(const std::string&, const Vec3&)> callback) {
+    m_gestureCallback = callback;
+}
+
+// === CREATIVE SOLUTION: VR RECORDING CONTROLS ===
+
+bool AudioRoutingOverlay::IsControllerNearPosition(const Vec3& targetPos, float tolerance) {
+    // Check if either controller is near the target position
+    bool leftNear = CalculateDistance(m_leftController.position, targetPos) <= tolerance;
+    bool rightNear = CalculateDistance(m_rightController.position, targetPos) <= tolerance;
+
+    return leftNear || rightNear;
+}
+
+void AudioRoutingOverlay::ToggleRecording() {
+    // Creative toggle between recording states
+    if (m_isRecording.load()) {
+        StopRecording();
+        LOG_INFO("✅ ASMRtist STOPPED recording via VR control - creative content creation complete!");
+    } else {
+        StartRecording();
+        LOG_INFO("🎤 ASMRtist STARTED recording via VR control - spatial magic begins!");
+    }
+
+    // Update UI interaction timestamp to keep overlay visible during recording changes
+    m_uiState.lastInteraction = std::chrono::steady_clock::now();
+
+    // Optional: Trigger haptic feedback on controllers if VR system supports it
+    if (vr::VRSystem() && m_leftControllerIndex != k_unTrackedDeviceIndexInvalid) {
+        // Brief haptic pulse to confirm action - creative tactile feedback!
+        vr::VRSystem()->TriggerHapticPulse(m_leftControllerIndex, 0, 1000);  // 1ms pulse
+    }
+    if (vr::VRSystem() && m_rightControllerIndex != k_unTrackedDeviceIndexInvalid) {
+        vr::VRSystem()->TriggerHapticPulse(m_rightControllerIndex, 0, 1000);  // 1ms pulse
+    }
 }
 
 } // namespace vrb
+
+// === ASMR UTILITY FUNCTIONS ===
+
+namespace vrb::asmr_utils {
+
+Vec3 CalculateOptimalMicPosition(const Vec3& userPos, float distance) {
+    // Simple optimal positioning - in front of user at head height
+    return Vec3{userPos.x, userPos.y, userPos.z - distance};
+}
+
+SpatialPreview CalculatePreview(const Vec3& micPos, const Vec3& userPos) {
+    // Calculate simple left/right volume based on microphone position relative to user
+    float dx = micPos.x - userPos.x;
+    float distance = std::sqrt(dx*dx + (micPos.y - userPos.y)*(micPos.y - userPos.y) + (micPos.z - userPos.z)*(micPos.z - userPos.z));
+
+    // Simple panning based on left/right offset
+    float pan = std::max(-1.0f, std::min(1.0f, dx / 2.0f));  // Normalize to [-1, 1]
+
+    SpatialPreview preview;
+    preview.distance = distance;
+    preview.leftVolume = (1.0f - pan) * 0.5f;   // More volume on left when mic is on left
+    preview.rightVolume = (1.0f + pan) * 0.5f;  // More volume on right when mic is on right
+
+    // Apply distance attenuation
+    float attenuation = 1.0f / (1.0f + distance * distance);
+    preview.leftVolume *= attenuation;
+    preview.rightVolume *= attenuation;
+
+    return preview;
+}
+
+} // namespace vrb::asmr_utils

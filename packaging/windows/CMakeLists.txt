@@ -35,6 +35,21 @@ set(INSTALLER_OUTPUT_DIR "${CMAKE_BINARY_DIR}/installer")
 # Create installer output directory
 file(MAKE_DIRECTORY "${INSTALLER_OUTPUT_DIR}")
 
+# Validate critical dependencies exist before packaging
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll")
+    message(FATAL_ERROR "OpenVR DLL not found at: ${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll")
+endif()
+
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h")
+    message(FATAL_ERROR "OpenVR header not found at: ${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h")
+endif()
+
+if(NOT EXISTS "${CMAKE_SOURCE_DIR}/deps/hrtf")
+    message(FATAL_ERROR "HRTF data directory not found at: ${CMAKE_SOURCE_DIR}/deps/hrtf")
+endif()
+
+message(STATUS "OpenVR dependencies validated successfully")
+
 # Configure installer script
 configure_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/installer.nsi"
@@ -91,8 +106,30 @@ if(NSIS_MAKENSIS)
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             "${CMAKE_SOURCE_DIR}/LICENSE"
             "${INSTALLER_OUTPUT_DIR}/"
+        # Copy OpenVR runtime DLL - CRITICAL for VR functionality
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll"
+            "${INSTALLER_OUTPUT_DIR}/"
+        # Copy OpenVR headers and libs for development builds
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${INSTALLER_OUTPUT_DIR}/third_party/openvr/include"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/third_party/openvr/include/openvr.h"
+            "${INSTALLER_OUTPUT_DIR}/third_party/openvr/include/"
+        COMMAND ${CMAKE_COMMAND} -E make_directory
+            "${INSTALLER_OUTPUT_DIR}/third_party/openvr/lib/win64"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_SOURCE_DIR}/third_party/openvr/lib/win64/openvr_api.lib"
+            "${INSTALLER_OUTPUT_DIR}/third_party/openvr/lib/win64/"
+        # Copy testing framework
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/test-installer.ps1"
+            "${INSTALLER_OUTPUT_DIR}/"
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/test-installer.bat"
+            "${INSTALLER_OUTPUT_DIR}/"
         DEPENDS vr_binaural_recorder
-        COMMENT "Preparing installer files"
+        COMMENT "Preparing installer files and testing framework"
     )
 
     # Download Visual C++ Redistributable
@@ -136,7 +173,20 @@ if(NSIS_MAKENSIS)
         )
     endif()
 
+    # Add installer testing target
+    add_custom_target(test_installer
+        COMMAND powershell -ExecutionPolicy Bypass -File "${INSTALLER_OUTPUT_DIR}/test-installer.ps1"
+            -InstallerPath "${INSTALLER_OUTPUT_DIR}/VRBinauralRecorder-1.0.0-Setup.exe"
+            -UninstallAfterTest:$$true
+            -Verbose
+            -ReportPath "${INSTALLER_OUTPUT_DIR}/installer-test-report.json"
+        DEPENDS windows_installer
+        WORKING_DIRECTORY "${INSTALLER_OUTPUT_DIR}"
+        COMMENT "Running automated installer tests"
+    )
+
     message(STATUS "Windows installer target 'windows_installer' available")
+    message(STATUS "Installer testing target 'test_installer' available")
     message(STATUS "NSIS found: ${NSIS_MAKENSIS}")
 else()
     message(WARNING "NSIS not found. Windows installer will not be available.")
@@ -163,8 +213,12 @@ add_custom_target(windows_portable
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "${CMAKE_SOURCE_DIR}/LICENSE"
         "${INSTALLER_OUTPUT_DIR}/VRBinauralRecorder-Portable/"
+    # Copy OpenVR DLL for portable package
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_SOURCE_DIR}/third_party/openvr/bin/win64/openvr_api.dll"
+        "${INSTALLER_OUTPUT_DIR}/VRBinauralRecorder-Portable/"
     DEPENDS vr_binaural_recorder
-    COMMENT "Creating portable Windows package"
+    COMMENT "Creating portable Windows package with OpenVR runtime"
 )
 
 # Create ZIP archive of portable package

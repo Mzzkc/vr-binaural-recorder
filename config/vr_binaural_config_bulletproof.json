@@ -1,0 +1,242 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "version": "1.0.0",
+  "description": "VR Binaural Recorder Configuration - ASMRtist Edition",
+
+  "audio": {
+    "engine": {
+      "bufferSize": 128,
+      "sampleRate": 48000,
+      "bitDepth": 24,
+      "channels": 2,
+      "latencyMode": "ultralow",
+      "processingThreads": 4,
+      "simdOptimization": true,
+      "dspChainBypass": false
+    },
+
+    "input": {
+      "defaultDevice": "auto",
+      "preferredDevices": [
+        "Blue Yeti",
+        "Audio-Technica AT2020",
+        "Rode NT1",
+        "Default Microphone"
+      ],
+      "gainControl": {
+        "enabled": true,
+        "defaultGain": 0.8,
+        "autoGainControl": false,
+        "noiseSupression": false,
+        "echoCancellation": false
+      },
+      "monitoring": {
+        "enabled": true,
+        "latencyCompensation": true,
+        "directMonitoring": false
+      }
+    },
+
+    "output": {
+      "defaultDevice": "auto",
+      "preferredDevices": [
+        "SteelSeries Arctis",
+        "HyperX Cloud",
+        "Default Speakers"
+      ],
+      "masterVolume": 0.85,
+      "safetyLimiter": {
+        "enabled": true,
+        "threshold": -3.0,
+        "releaseTime": 0.05
+      }
+    },
+
+    "spatial": {
+      "hrtfDataset": "mit_kemar",
+      "hrtfQuality": "high",
+      "interpolation": "bilinear",
+      "distanceModel": "inverse_square",
+      "dopplerEffect": false,
+      "roomSimulation": {
+        "enabled": false,
+        "roomSize": "small",
+        "reverbAmount": 0.1
+      },
+      "headRadius": 0.09,
+      "earSpacing": 0.18
+    },
+
+    "recording": {
+      "format": "wav",
+      "quality": "lossless",
+      "sampleRate": 48000,
+      "bitDepth": 24,
+      "outputDirectory": "${DOCUMENTS}/VRBinauralRecorder/Recordings",
+      "filenameTemplate": "ASMR_${DATE}_${TIME}_${POSITION}",
+      "autoSave": true,
+      "bufferSeconds": 5
+    }
+  },
+
+  "vr": {
+    "runtime": "openvr",
+    "enabled": "auto",
+    "fallbackToDesktop": true,
+
+    "tracking": {
+      "updateRate": 90,
+      "predictionTime": 0.011,
+      "smoothing": true,
+      "smoothingFactor": 0.3
+    },
+
+    "controllers": {
+      "hapticFeedback": true,
+      "hapticIntensity": 0.5,
+      "triggerDeadzone": 0.1,
+      "gripToggleMode": false
+    },
+
+    "cockpit": {
+      "uiScale": 1.0,
+      "uiDistance": 1.5,
+      "followHead": true,
+      "showFloor": true,
+      "showBoundaries": true
+    },
+
+    "calibration": {
+      "floorHeight": 0.0,
+      "playspaceCenter": [0.0, 0.0, 0.0],
+      "forwardDirection": [0.0, 0.0, -1.0]
+    }
+  },
+
+  "desktop": {
+    "mouseControl": {
+      "sensitivity": 1.0,
+      "invertY": false,
+      "scrollZoom": true,
+      "middleButtonPan": true
+    },
+
+    "keyboard": {
+      "shortcuts": {
+        "record": "Space",
+        "stop": "Escape",
+        "resetPosition": "R",
+        "toggleMute": "M",
+        "quickSave": "Ctrl+S"
+      }
+    },
+
+    "visualization": {
+      "show3DSpace": true,
+      "showGrid": true,
+      "showAudioMeters": true,
+      "showPositionInfo": true,
+      "theme": "dark"
+    }
+  },
+
+  "asmr_presets": {
+    "whisper_left": {
+      "position": [-0.3, 0.0, 0.1],
+      "gain": 0.9,
+      "distance": 0.15
+    },
+    "whisper_right": {
+      "position": [0.3, 0.0, 0.1],
+      "gain": 0.9,
+      "distance": 0.15
+    },
+    "overhead": {
+      "position": [0.0, 0.5, 0.0],
+      "gain": 0.7,
+      "distance": 0.4
+    },
+    "ear_to_ear": {
+      "animation": true,
+      "speed": 0.5,
+      "path": "sine"
+    },
+    "circling": {
+      "animation": true,
+      "speed": 0.3,
+      "radius": 0.3
+    }
+  },
+
+  "performance": {
+    "gpuAcceleration": "auto",
+    "cpuAffinity": "auto",
+    "memoryLimit": 512,
+    "diskCache": {
+      "enabled": true,
+      "maxSize": 1024,
+      "location": "${TEMP}/VRBinauralCache"
+    },
+    "diagnostics": {
+      "showFPS": false,
+      "showLatency": false,
+      "showCPUUsage": false,
+      "logLevel": "info"
+    }
+  },
+
+  "streaming": {
+    "obs": {
+      "virtualCameraOutput": false,
+      "virtualAudioOutput": true,
+      "outputName": "VR Binaural Audio"
+    },
+    "rtmp": {
+      "enabled": false,
+      "server": "",
+      "key": ""
+    }
+  },
+
+  "accessibility": {
+    "visualIndicators": true,
+    "highContrast": false,
+    "fontSize": "medium",
+    "tooltips": true,
+    "audioFeedback": {
+      "enabled": true,
+      "volume": 0.5
+    }
+  },
+
+  "updates": {
+    "checkAutomatically": true,
+    "channel": "stable",
+    "lastCheck": "",
+    "autoDownload": false
+  },
+
+  "privacy": {
+    "telemetry": false,
+    "crashReports": false,
+    "usageStats": false,
+    "sharePresets": false
+  },
+
+  "backup": {
+    "autoBackup": true,
+    "backupInterval": 86400,
+    "maxBackups": 5,
+    "backupLocation": "${DOCUMENTS}/VRBinauralRecorder/Backups"
+  },
+
+  "experimental": {
+    "enabled": false,
+    "features": {
+      "aiDenoising": false,
+      "tensorflowOptimization": false,
+      "multiGPU": false,
+      "neuralHRTF": false
+    }
+  }
+}

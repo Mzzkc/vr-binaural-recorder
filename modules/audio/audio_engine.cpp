@@ -608,6 +608,70 @@ std::vector<AudioEngine::DeviceInfo> AudioEngine::GetInputDevices() const {
     return devices;
 }
 
+// Static method to enumerate audio devices without requiring AudioEngine initialization
+std::vector<AudioEngine::DeviceInfo> AudioEngine::EnumerateAudioDevices() {
+    std::vector<DeviceInfo> devices;
+
+    // Initialize PortAudio if not already initialized
+    static bool paInitialized = false;
+    if (!paInitialized) {
+        PaError err = Pa_Initialize();
+        if (err != paNoError) {
+            std::cerr << "Failed to initialize PortAudio: " << Pa_GetErrorText(err) << std::endl;
+            return devices;
+        }
+        paInitialized = true;
+    }
+
+    int numDevices = Pa_GetDeviceCount();
+    if (numDevices < 0) {
+        std::cerr << "Failed to get device count: " << Pa_GetErrorText(numDevices) << std::endl;
+        return devices;
+    }
+
+    for (int i = 0; i < numDevices; i++) {
+        const PaDeviceInfo* info = Pa_GetDeviceInfo(i);
+        if (info) {
+            DeviceInfo device;
+            device.index = i;
+            device.name = info->name;
+            device.maxInputChannels = info->maxInputChannels;
+            device.maxOutputChannels = info->maxOutputChannels;
+            device.defaultSampleRate = info->defaultSampleRate;
+            device.lowInputLatency = info->defaultLowInputLatency;
+            device.lowOutputLatency = info->defaultLowOutputLatency;
+
+            // Determine host API
+            const PaHostApiInfo* hostInfo = Pa_GetHostApiInfo(info->hostApi);
+            if (hostInfo) {
+                switch (hostInfo->type) {
+                    case paASIO: device.hostAPI = HostAPI::ASIO; break;
+                    case paWASAPI: device.hostAPI = HostAPI::WASAPI; break;
+                    case paCoreAudio: device.hostAPI = HostAPI::CoreAudio; break;
+                    case paALSA: device.hostAPI = HostAPI::ALSA; break;
+                    case paJACK: device.hostAPI = HostAPI::Jack; break;
+                    default: device.hostAPI = HostAPI::Default; break;
+                }
+            } else {
+                device.hostAPI = HostAPI::Default;
+            }
+
+            // Check for exclusive mode support
+            device.supportsExclusiveMode = (device.hostAPI == HostAPI::WASAPI ||
+                                          device.hostAPI == HostAPI::CoreAudio ||
+                                          device.hostAPI == HostAPI::ASIO);
+
+            // Basic supported formats - simplified for device listing
+            device.supportedFormats = {AudioFormat::Float32, AudioFormat::Int32, AudioFormat::Int16};
+            device.supportedSampleRates = {44100, 48000, 96000};
+
+            devices.push_back(device);
+        }
+    }
+
+    return devices;
+}
+
 bool AudioEngine::SelectInputDevice(int deviceIndex) {
     if (!m_initialized) {
         LOG_ERROR("Audio engine not initialized");

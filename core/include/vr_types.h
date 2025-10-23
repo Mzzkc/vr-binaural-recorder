@@ -123,8 +123,9 @@ struct VRPose {
     Vec3 angularVelocity;
     bool isValid;
     double timestamp;
+    float trigger;
 
-    VRPose() : isValid(false), timestamp(0) {}
+    VRPose() : isValid(false), timestamp(0), trigger(0.0f) {}
 
     // Get forward direction
     Vec3 forward() const {

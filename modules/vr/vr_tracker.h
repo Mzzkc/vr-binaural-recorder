@@ -4,6 +4,7 @@
 #pragma once
 
 #include <openvr.h>
+// Using real OpenVR SDK for VR head tracking - no more stubs
 #include <functional>
 #include <mutex>
 #include <vector>

@@ -31,6 +31,8 @@ public:
 
     bool Initialize(const std::string& hrtfDataPath);
     void UpdateSpatialPosition(const VRPose& hmdPose, const std::vector<VRPose>& controllerPoses);
+    void SetListenerPosition(const Vec3& position);
+    void SetListenerOrientation(const Vec3& orientation);
     void Process(const float* input, float* output, size_t frames, int inputChannels);
     void Reset();
 
@@ -108,7 +110,7 @@ private:
         float m_currentAzimuth{0.0f};
         float m_currentElevation{0.0f};
         float m_currentDistance{1.0f};
-        static constexpr float SMOOTHING_FACTOR = 0.95f;
+        static constexpr float SMOOTHING_FACTOR = 0.01f;
     };
 
     bool LoadHRTFDataset(const std::string& path);

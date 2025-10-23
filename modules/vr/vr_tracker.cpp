@@ -152,30 +152,20 @@ void VRTracker::Update() {
     // Modern API with fallback for development stub
     vr::TrackedDevicePose_t poses[vr::k_unMaxTrackedDeviceCount];
 
-    // Modern API implementation with stub compatibility
-    #ifdef OPENVR_STUB_BUILD
-        // Development stub - use optimized legacy API with proper prediction
+    // Production VR tracking with real OpenVR SDK
+    // CEO directive: VR head tracking IS the product differentiator
+    if (vr::VRCompositor() != nullptr) {
+        // WaitGetPoses provides frame-synchronized poses with <5ms latency
+        vr::VRCompositor()->WaitGetPoses(poses, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
+    } else {
+        // Fallback for non-compositor applications
         m_vrSystem->GetDeviceToAbsoluteTrackingPose(
             vr::TrackingUniverseStanding,
-            0.011f,  // ~11ms prediction for 90Hz (1/90 ≈ 0.011s) - optimized for low latency
+            0.011f,  // Optimized prediction timing
             poses,
             vr::k_unMaxTrackedDeviceCount
         );
-    #else
-        // Production: Use modern frame-synchronized API for optimal performance
-        if (vr::VRCompositor() != nullptr) {
-            // WaitGetPoses provides frame-synchronized poses with <5ms latency
-            vr::VRCompositor()->WaitGetPoses(poses, vr::k_unMaxTrackedDeviceCount, nullptr, 0);
-        } else {
-            // Fallback for non-compositor applications
-            m_vrSystem->GetDeviceToAbsoluteTrackingPose(
-                vr::TrackingUniverseStanding,
-                0.011f,  // Optimized prediction timing
-                poses,
-                vr::k_unMaxTrackedDeviceCount
-            );
-        }
-    #endif
+    }
 
     // Extract what we actually need
     {

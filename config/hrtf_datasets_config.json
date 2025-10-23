@@ -1,46 +1,30 @@
 {
   "hrtf": {
     "datasets": {
-      "mit_kemar_compact": {
-        "path": "hrtf_data/mit_kemar_compact",
-        "format": "wav",
+      "mit_kemar": {
+        "path": "hrtf_data/mit_kemar",
+        "format": "raw",
         "sample_rate": 44100,
-        "description": "MIT KEMAR compact dataset - dummy head measurements",
-        "structure": "elevation_directories",
-        "file_pattern": "H{elevation}e{azimuth:03d}a.wav",
-        "directory_pattern": "elev{elevation}",
-        "elevations": [-40, -30, -20, -10, 0, 10, 20, 30, 40, 50, 60, 70, 80, 90],
-        "azimuth_step": 5,
-        "notes": [
-          "Files are organized in elevation directories (elev-40, elev-30, etc.)",
-          "Filename pattern: H{elev}e{azim}a.wav where azim is in degrees",
-          "Azimuth ranges from 0-355 degrees in 5-degree steps",
-          "Single channel files - left and right ear data may be in separate datasets"
-        ]
+        "description": "MIT KEMAR dummy head measurements"
       },
       "cipic": {
         "path": "hrtf_data/cipic",
         "format": "mat",
         "sample_rate": 44100,
-        "description": "CIPIC database with 45 subjects (if available)",
-        "enabled": false
+        "description": "CIPIC database with 45 subjects"
+      },
+      "sofa_samples": {
+        "path": "hrtf_data/sofa_samples",
+        "format": "sofa",
+        "sample_rate": 44100,
+        "description": "SOFA format sample datasets"
       }
     },
-    "default_dataset": "mit_kemar_compact",
+    "default_dataset": "mit_kemar",
     "processing": {
       "filter_length": 512,
       "crossfade_samples": 64,
-      "interpolation": "linear",
-      "distance_modeling": {
-        "enabled": true,
-        "reference_distance": 1.4,
-        "near_field_compensation": true
-      }
-    },
-    "runtime": {
-      "preload_datasets": ["mit_kemar_compact"],
-      "cache_size_mb": 128,
-      "use_threading": true
+      "interpolation": "linear"
     }
   }
 }

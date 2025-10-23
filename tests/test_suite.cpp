@@ -205,8 +205,10 @@ TEST_F(HRTFProcessorTest, DistanceAttenuation) {
     // Process with near position
     VRPose headNear;
     headNear.position = {0.0f, 1.2f, -0.5f};
+    headNear.isValid = true;
     VRPose mic;
     mic.position = {0.0f, 1.2f, -1.0f};
+    mic.isValid = true; // CRITICAL: Must mark controller as valid for spatial positioning
     std::vector<VRPose> controllers = {mic}; // Wrap mic in vector for API compatibility
 
     processor->UpdateSpatialPosition(headNear, controllers);
@@ -215,6 +217,7 @@ TEST_F(HRTFProcessorTest, DistanceAttenuation) {
     // Process with far position
     VRPose headFar;
     headFar.position = {0.0f, 1.2f, -5.0f};
+    headFar.isValid = true;
 
     processor->UpdateSpatialPosition(headFar, controllers);
     processor->Process(input.data(), outputFar.data(), frames, 1);

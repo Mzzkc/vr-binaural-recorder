@@ -1,67 +1,59 @@
 {
   "audio": {
+    "bufferSize": 128,
     "sampleRate": 48000,
-    "bufferSize": 256,
     "inputDevice": "default",
     "outputDevice": "default",
-    "inputChannels": 1,
-    "outputChannels": 2,
-    "useASIO": false,
-    "useWASAPI": true,
-    "enableExclusiveMode": false
-  },
-  "hrtf": {
-    "dataPath": "./hrtf_data/KEMAR_HRTF.sofa",
-    "filterLength": 128,
-    "enableInterpolation": true,
-    "convolutionMethod": "overlap_add",
-    "enableNearFieldCompensation": true,
-    "distanceAttenuationModel": "inverse_square"
-  },
-  "vr": {
-    "trackingRate": 90,
-    "enablePrediction": true,
-    "predictionTime": 0.011,
-    "smoothingFactor": 0.95,
-    "calibrationOffset": {
-      "x": 0.0,
-      "y": 0.0,
-      "z": 0.0
+    "api": "wasapi",
+    "channels": {
+      "input": 1,
+      "output": 2
     },
-    "overlay": {
-      "enabled": true,
-      "width": 2.0,
-      "position": {
-        "x": 0.0,
-        "y": 1.5,
-        "z": -1.0
-      },
-      "autoHide": true,
-      "autoHideDelay": 5000
+    "format": {
+      "bitDepth": 32,
+      "float": true
     }
   },
+  "hrtf": {
+    "dataPath": "./hrtf_data/",
+    "dataset": "kemar_mit",
+    "filterLength": 512,
+    "interpolation": true,
+    "convolutionMethod": "overlap_add",
+    "nearFieldCompensation": true
+  },
+  "spatial": {
+    "maxDistance": 10.0,
+    "referenceDistance": 1.0,
+    "rolloffFactor": 1.0,
+    "distanceModel": "inverse",
+    "dopplerEffect": false,
+    "roomSize": "medium",
+    "enableReverb": false
+  },
+  "ui": {
+    "enableManualPositioning": true,
+    "showDebugInfo": false,
+    "theme": "dark",
+    "autoHide": true,
+    "autoHideDelay": 5000
+  },
   "performance": {
-    "audioThreadPriority": "high",
-    "vrThreadPriority": "normal",
-    "enableSIMD": true,
-    "enableFastMath": true,
-    "memoryPoolSize": 8388608,
-    "enableProfiling": false
+    "threadPriority": "high",
+    "simdLevel": "auto",
+    "useMemoryPool": true,
+    "ringBufferSize": 4096
   },
   "logging": {
     "level": "info",
-    "path": "./logs",
-    "enableAsync": true,
-    "rotationSize": 10485760,
-    "maxFiles": 5,
-    "enableConsole": true,
-    "enableFile": true
+    "console": true,
+    "file": true,
+    "path": "./logs/"
   },
   "debug": {
-    "enableMetrics": true,
-    "enableValidation": true,
-    "enableVerboseAudio": false,
-    "enableVerboseVR": false,
-    "enableProfiling": false
+    "enableMetrics": false,
+    "verboseAudio": false,
+    "testMode": false,
+    "skipHRTFLoading": false
   }
 }

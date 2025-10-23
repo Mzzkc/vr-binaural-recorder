@@ -1,20 +1,22 @@
-// audio_routing_overlay.h - Creative SteamVR Audio Routing Interface
-// 🎧 THE AUDIO COCKPIT - Where sound becomes magic! 🎧
+// audio_routing_overlay.h - Simple ASMRtist Microphone Positioning Interface
+// 🎤 Simple tools for content creators to position their mic in VR space 🎤
 #pragma once
 
-#include <openvr.h>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 #include <atomic>
 #include <mutex>
 #include <functional>
-#include <map>
 #include <chrono>
-#include "vr_types.h"
-#include "vr_tracker.h"
-#include "audio_engine.h"
-#include "hrtf_processor.h"
+
+// Using real OpenVR SDK for VR-first spatial audio
+#include <openvr.h>
+#include "../../core/include/vr_types.h"
+#include "../vr/vr_tracker.h"
+#include "../audio/audio_engine.h"
+#include "../audio/hrtf_processor.h"
 
 namespace vrb {
 
@@ -22,14 +24,13 @@ namespace vrb {
 class HRTFProcessor;
 
 /**
- * @brief Revolutionary SteamVR Audio Routing Interface
+ * @brief Simple VR Microphone Positioning Interface for ASMRtists
  *
- * This is NOT just another boring control panel!
- * This is a holographic audio playground where users:
- * - SEE their audio streams as flowing particles
- * - GRAB sound sources and route them intuitively
- * - CONDUCT their audio like a spatial orchestra
- * - TRANSFORM boring audio routing into a magical VR experience
+ * A focused tool that helps ASMRtists:
+ * - Position their microphone in VR space
+ * - Move around to create spatial audio effects
+ * - Record/stream spatialized output
+ * - Simple controls for content creation workflow
  */
 class AudioRoutingOverlay {
 public:
@@ -45,55 +46,41 @@ public:
     void SetVisible(bool visible);
     bool IsVisible() const { return m_visible.load(); }
 
-    // Spatial positioning
-    void SetPosition(const Vec3& position);
-    void SetScale(float scale);
-    void AttachToController(bool enabled);
+    // Microphone positioning for ASMRtists
+    void SetMicrophonePosition(const Vec3& position);
+    void SetMicrophoneOrientation(const Vec3& forward);
+    Vec3 GetMicrophonePosition() const;
 
-    // Quick preset system - instant audio magic!
-    enum class AudioPreset {
-        CINEMA,     // Movie theater experience
-        CONCERT,    // Live performance feel
-        PODCAST,    // Intimate voice chat
-        GAMING,     // Competitive gaming audio
-        MUSIC       // High-fidelity listening
-    };
-    void ApplyPreset(AudioPreset preset);
+    // Simple recording controls
+    void StartRecording();
+    void StopRecording();
+    bool IsRecording() const;
+    void SetMonitoring(bool enabled);  // Hear spatial effect in real-time
 
-    // Audio source management
-    struct AudioSource {
-        std::string name;
-        float volume = 1.0f;
-        Vec3 spatialPosition{0, 0, 0};
-        bool enabled = true;
-        bool isMuted = false;
-        float* spectrumData = nullptr;  // Real-time spectrum visualization
-        int spectrumSize = 0;
-
-        // Visual representation
-        Vec3 orbPosition{0, 0, 0};     // Position of the audio orb
-        float orbSize = 0.1f;          // Size based on volume
-        Vec3 orbColor{1, 1, 1};        // Color based on frequency content
-        float orbPulse = 0.0f;         // Pulsing animation based on audio
+    // Virtual microphone representation
+    struct VirtualMicrophone {
+        Vec3 position{0, 1.5f, 0};     // Default at head height in front of user
+        Vec3 orientation{0, 0, -1};    // Facing forward
+        float sensitivity = 1.0f;
+        bool isVisible = true;
+        bool isActive = false;
     };
 
-    void AddAudioSource(const std::string& name);
-    void RemoveAudioSource(const std::string& name);
-    AudioSource* GetAudioSource(const std::string& name);
-    std::vector<AudioSource*> GetAllAudioSources();
+    VirtualMicrophone& GetVirtualMicrophone() { return m_virtualMic; }
 
-    // Gesture callbacks - make audio routing FUN!
-    using GestureCallback = std::function<void(const std::string& gesture, const Vec3& position)>;
-    void RegisterGestureCallback(GestureCallback callback);
+    // Simple VR Integration - Basic controller tracking for mic positioning
+    void UpdateControllerTracking(const std::vector<VRPose>& controllers);
+    void UpdateMicrophoneTracking(const VRPose& hmdPose);
 
-    // VR Integration - Direct callbacks from 90Hz VR tracking thread
+    // Gesture detection for Audio Cockpit compatibility
     void UpdateGestureDetection(const std::vector<VRPose>& controllers);
     void UpdateAudioOrbPositions(const VRPose& hmdPose);
+    void RegisterGestureCallback(std::function<void(const std::string&, const Vec3&)> callback);
 
-    // Audio Engine Integration - Real-time stats for orb visualization
-    // TODO: Implement when AudioEngine has SetStatsCallback method
-    // void OnAudioStatsUpdate(const AudioStats& stats);
+    // Audio Engine Integration - Simple level monitoring
     void SetHRTFProcessor(HRTFProcessor* processor);
+    float GetInputLevel() const;
+    float GetSpatializedOutputLevel() const;
 
 private:
     // === CORE VR OVERLAY MAGIC ===
@@ -106,104 +93,30 @@ private:
     void UpdateOverlayTexture();
     void UpdateOverlayTransform();
 
-    // === GESTURE RECOGNITION SYSTEM ===
+    // === SIMPLE CONTROLLER INTERACTION ===
     struct ControllerState {
         Vec3 position{0, 0, 0};
-        Vec3 velocity{0, 0, 0};
-        float trigger = 0.0f;
-        bool isGripping = false;
-        bool wasGripping = false;
-        AudioSource* grabbedSource = nullptr;
-
-        // Gesture detection
-        std::chrono::steady_clock::time_point lastUpdate;
-        std::vector<Vec3> positionHistory;  // For swipe detection
-        float twistAngle = 0.0f;            // For parameter adjustment
+        bool triggerPressed = false;
+        bool wasTriggered = false;
+        bool isDraggingMic = false;  // Simple drag to position microphone
     };
 
     void UpdateControllerStates();
-    void ProcessGestures();
-    void DetectPinchGesture(ControllerState& controller);
-    void DetectSwipeGesture(ControllerState& controller);
-    void DetectTwistGesture(ControllerState& controller);
-    void DetectClapGesture();  // Two-handed proximity
+    void HandleMicrophonePositioning();  // Simple trigger-drag to move mic
 
-    // === HOLOGRAPHIC UI RENDERING ===
-    void RenderAudioCockpit();
-    void RenderAudioOrbs();
-    void RenderParticleStreams();
-    void RenderSpatialGrid();
-    void RenderQuickActionRing();
-    void RenderHRTFVisualizer();
+    // === SIMPLE UI RENDERING ===
+    void RenderMicrophoneVisual();      // Simple mic icon in VR space
+    void RenderRecordingStatus();       // Recording indicator
+    void RenderSimpleControls();        // Basic start/stop/monitor buttons
 
-    // Audio orb interaction
-    void UpdateAudioOrbs();
-    AudioSource* GetOrbAtPosition(const Vec3& position, float tolerance = 0.1f);
-    void HandleOrbGrab(AudioSource* source, const Vec3& controllerPos);
-    void HandleOrbRelease(AudioSource* source);
+    // === SIMPLE AUDIO LEVEL VISUALIZATION ===
+    void RenderAudioLevelMeter();       // Basic level meter for input monitoring
 
-    // === PARTICLE SYSTEM - AUDIO VISUALIZATION ===
-    struct AudioParticle {
-        Vec3 position;
-        Vec3 velocity;
-        float lifetime;
-        float intensity;
-        Vec3 color;
-        AudioSource* sourceOrb = nullptr;
-
-        void Update(float deltaTime);
-        bool IsAlive() const { return lifetime > 0.0f; }
-    };
-
-    std::vector<AudioParticle> m_particles;
-    void UpdateParticleSystem();
-    void EmitParticlesFromSource(AudioSource* source);
-    void RenderParticles();
-
-    // === CREATIVE SHORTCUTS & HACKS ===
-    // Global audio buffer for instant visualization access
-    // TODO: Properly thread this when we optimize!
-    static constexpr size_t VISUALIZATION_BUFFER_SIZE = 1024;
-    float m_globalAudioBuffer[VISUALIZATION_BUFFER_SIZE];
-    std::atomic<bool> m_bufferReady{false};
-
-    // Pre-calculated HRTF presets for instant switching
-    struct HRTFPresetData {
-        float roomSize;
-        float reverbMix;
-        float distanceAttenuation;
-        bool nearFieldCompensation;
-        std::string displayName;
-    };
-    std::map<AudioPreset, HRTFPresetData> m_hrtfPresets;
-
-    // Ring buffer for lock-free audio stats
-    template<typename T, size_t SIZE>
-    class LockFreeRing {
-    public:
-        void Push(const T& item) {
-            size_t idx = m_writeIndex.fetch_add(1) % SIZE;
-            m_buffer[idx] = item;
-        }
-
-        bool Pop(T& item) {
-            size_t writeIdx = m_writeIndex.load();
-            size_t readIdx = m_readIndex.load();
-            if (readIdx == writeIdx) return false;
-
-            item = m_buffer[readIdx % SIZE];
-            m_readIndex.store((readIdx + 1) % SIZE);
-            return true;
-        }
-
-    private:
-        std::atomic<size_t> m_writeIndex{0};
-        std::atomic<size_t> m_readIndex{0};
-        T m_buffer[SIZE];
-    };
-
-    // TODO: Enable when AudioEngine stats callback is available
-    // LockFreeRing<AudioStats, 64> m_audioStatsRing;
+    // === SIMPLE AUDIO MONITORING ===
+    // Basic audio level tracking for content creators
+    std::atomic<float> m_inputLevel{0.0f};
+    std::atomic<float> m_outputLevel{0.0f};
+    std::atomic<bool> m_isRecording{false};
 
     // === STATE MANAGEMENT ===
     std::atomic<bool> m_initialized{false};
@@ -240,54 +153,68 @@ private:
     uint32_t m_leftControllerIndex = k_unTrackedDeviceIndexInvalid;
     uint32_t m_rightControllerIndex = k_unTrackedDeviceIndexInvalid;
 
-    // Audio sources
-    std::map<std::string, std::unique_ptr<AudioSource>> m_audioSources;
+    // Virtual microphone state
+    VirtualMicrophone m_virtualMic;
 
-    // UI state
+    // Simple UI state
     struct UIState {
-        bool showParticles = true;
-        bool showSpatialGrid = true;
-        bool showQuickRing = true;
-        bool showHRTFVisualizer = true;
+        bool showMicrophone = true;
+        bool showControls = true;
+        bool showLevelMeter = true;
+        bool monitoring = false;  // Real-time audio monitoring
 
-        float particleIntensity = 1.0f;
-        float gridOpacity = 0.3f;
-        AudioPreset currentPreset = AudioPreset::GAMING;
-
-        // Animation timers
-        float pulseTimer = 0.0f;
-        float rotationSpeed = 1.0f;
-
-        // Auto-hide functionality
+        // Auto-hide functionality for minimal interface
         bool autoHide = true;
-        int autoHideDelayMs = 5000;
+        int autoHideDelayMs = 3000;  // Shorter for content creation focus
         std::chrono::steady_clock::time_point lastInteraction;
     } m_uiState;
 
-    // Callbacks
-    std::vector<GestureCallback> m_gestureCallbacks;
-
-    // === PERFORMANCE OPTIMIZATION ===
-    void InitializePresets();
-    void UpdateMetrics();
+    // === SIMPLE FUNCTIONALITY ===
     void HandleAutoHide();
-    void SyncToCompositor();  // Piggyback on VR compositor timing
-
-    // Audio integration
-    void OnAudioCallback(const float* inputBuffer, size_t frames);
-    void UpdateAudioVisualization();
+    void UpdateAudioLevels();
 
     // Helper methods
-    // Using Vec3 instead of VRControllerState_t for stub compatibility
-    Vec3 ControllerToWorldSpace(const Vec3& position, uint32_t deviceIndex);
     float CalculateDistance(const Vec3& a, const Vec3& b);
-    Vec3 HSVToRGB(float h, float s, float v);  // For spectrum coloring
-    float SmoothStep(float edge0, float edge1, float x);  // Smooth animations
+    bool IsControllerNearMicrophone(const Vec3& controllerPos, float tolerance = 0.2f);
 
-    // Debug visualization
+    // Creative solution: New methods for VR recording controls
+    bool IsControllerNearPosition(const Vec3& targetPos, float tolerance = 0.3f);
+    void ToggleRecording();  // Start/stop recording toggle
+
+    // Button state tracking for VR interaction
+    bool m_recordButtonPressed = false;
+    bool m_monitorButtonPressed = false;
+
+    // Gesture callback for compatibility
+    std::function<void(const std::string&, const Vec3&)> m_gestureCallback;
+
+    // Simple debug info
     bool m_debugMode = false;
     void RenderDebugInfo();
-    void ToggleDebugMode() { m_debugMode = !m_debugMode; }
 };
 
 } // namespace vrb
+
+// Simple utility functions for ASMRtist workflow
+namespace vrb::asmr_utils {
+    /**
+     * @brief Calculate optimal microphone positioning for spatial effect
+     * @param userPos Current user/HMD position
+     * @param distance Desired distance from user
+     * @return Recommended microphone position
+     */
+    Vec3 CalculateOptimalMicPosition(const Vec3& userPos, float distance = 1.0f);
+
+    /**
+     * @brief Simple spatial audio preview without recording
+     * @param micPos Virtual microphone position
+     * @param userPos User head position
+     * @return Spatial audio preview settings
+     */
+    struct SpatialPreview {
+        float leftVolume;
+        float rightVolume;
+        float distance;
+    };
+    SpatialPreview CalculatePreview(const Vec3& micPos, const Vec3& userPos);
+}
