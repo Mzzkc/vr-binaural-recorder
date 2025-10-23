@@ -66,7 +66,7 @@ endif()
 add_executable(test_jsoncpp test_jsoncpp.cpp)
 
 target_link_libraries(test_jsoncpp PRIVATE
-    jsoncpp_lib
+    jsoncpp_static
     Threads::Threads
 )
 

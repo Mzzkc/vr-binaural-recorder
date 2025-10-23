@@ -82,14 +82,14 @@ target_link_libraries(test_audio_engine PRIVATE
     Threads::Threads
     portaudio_static
     spdlog::spdlog
-    jsoncpp_lib
+    jsoncpp_static
 )
 
 # Link libraries for VR test - FIXED OpenVR reference!
 target_link_libraries(test_vr_tracker PRIVATE
     Threads::Threads
     spdlog::spdlog
-    jsoncpp_lib
+    jsoncpp_static
     ${OPENVR_LIBRARIES}
 )
 
