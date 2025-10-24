@@ -76,7 +76,8 @@ target_compile_definitions(compilation_fixes_validation PRIVATE
     VR_TESTING_MODE=1
 )
 
-# Windows RC Validation Suite
+# Windows RC Validation Suite (Windows-only)
+if(WIN32)
 add_executable(windows_rc_validation
     windows_rc_validation.cpp
 )
@@ -121,6 +122,16 @@ if(WIN32)
         VRB_ENABLE_ASIO=1
     )
 endif()
+
+# Register Windows RC validation test (Windows only)
+if(WIN32)
+    add_test(NAME WindowsRCValidation COMMAND windows_rc_validation)
+    set_tests_properties(WindowsRCValidation PROPERTIES
+        TIMEOUT 300
+        LABELS "windows;rc;validation"
+    )
+endif()
+endif()  # Outer WIN32 for windows_rc_validation target
 
 # Audio Engine Performance Tests
 add_executable(audio_performance_tests
@@ -274,7 +285,6 @@ target_compile_definitions(ceo_spatial_validation PRIVATE
 
 # Register tests with CTest
 add_test(NAME CompilationFixesValidation COMMAND compilation_fixes_validation)
-add_test(NAME WindowsRCValidation COMMAND windows_rc_validation)
 add_test(NAME AudioPerformanceTests COMMAND audio_performance_tests)
 add_test(NAME VRHeadsetTests COMMAND vr_headset_tests)
 add_test(NAME IntegrationTests COMMAND integration_tests)
@@ -286,11 +296,6 @@ add_test(NAME CEOSpatialValidation COMMAND ceo_spatial_validation)
 set_tests_properties(CompilationFixesValidation PROPERTIES
     TIMEOUT 60
     LABELS "compilation;fixes;validation;critical"
-)
-
-set_tests_properties(WindowsRCValidation PROPERTIES
-    TIMEOUT 300
-    LABELS "windows;rc;validation"
 )
 
 set_tests_properties(AudioPerformanceTests PROPERTIES

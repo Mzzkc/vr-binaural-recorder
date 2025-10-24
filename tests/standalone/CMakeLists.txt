@@ -36,10 +36,9 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(portaudio spdlog jsoncpp)
 
-# OpenVR - Use stub headers for development (same as main project)
-set(OPENVR_ROOT_DIR "${CMAKE_SOURCE_DIR}/third_party/openvr_stub")
-set(OPENVR_INCLUDE_DIRS "${OPENVR_ROOT_DIR}/headers")
-set(OPENVR_LIBRARIES "")
+# OpenVR - Use real SDK from parent scope (already configured in main CMakeLists.txt)
+# OPENVR_INCLUDE_DIRS and OPENVR_LIBRARIES are inherited from parent scope
+# No need to redefine them here
 
 # Audio engine test sources - FIXED PATHS for modular architecture!
 set(AUDIO_TEST_SOURCES
