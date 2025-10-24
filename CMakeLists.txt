@@ -321,6 +321,12 @@ target_include_directories(vr_binaural_recorder PRIVATE
     ${glfw_SOURCE_DIR}/include
 )
 
+# Add PortAudio include directories (for portaudio.h in audio_engine.h)
+get_target_property(PORTAUDIO_INCLUDE_DIRS portaudio_static INTERFACE_INCLUDE_DIRECTORIES)
+if(PORTAUDIO_INCLUDE_DIRS)
+    target_include_directories(vr_binaural_recorder PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
+endif()
+
 # Link libraries
 target_link_libraries(vr_binaural_recorder PRIVATE
     Threads::Threads
@@ -427,6 +433,12 @@ target_include_directories(vr_binaural_tests PRIVATE
     ${GLEW_INCLUDE_DIRS}
     ${glfw_SOURCE_DIR}/include
 )
+
+# Add PortAudio include directories
+get_target_property(PORTAUDIO_INCLUDE_DIRS portaudio_static INTERFACE_INCLUDE_DIRECTORIES)
+if(PORTAUDIO_INCLUDE_DIRS)
+    target_include_directories(vr_binaural_tests PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
+endif()
 
 target_link_libraries(vr_binaural_tests PRIVATE
     Threads::Threads

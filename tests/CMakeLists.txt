@@ -39,6 +39,12 @@ target_include_directories(compilation_fixes_validation PRIVATE
     ${glfw_SOURCE_DIR}/include
 )
 
+# Add PortAudio include directories
+get_target_property(PORTAUDIO_INCLUDE_DIRS portaudio_static INTERFACE_INCLUDE_DIRECTORIES)
+if(PORTAUDIO_INCLUDE_DIRS)
+    target_include_directories(compilation_fixes_validation PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
+endif()
+
 target_link_libraries(compilation_fixes_validation PRIVATE
     gtest
     gtest_main
@@ -84,6 +90,12 @@ target_include_directories(windows_rc_validation PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/common/simd
     ${OPENVR_INCLUDE_DIRS}
 )
+
+# Add PortAudio include directories for Windows tests
+get_target_property(PORTAUDIO_INCLUDE_DIRS portaudio_static INTERFACE_INCLUDE_DIRECTORIES)
+if(PORTAUDIO_INCLUDE_DIRS)
+    target_include_directories(windows_rc_validation PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
+endif()
 
 target_link_libraries(windows_rc_validation PRIVATE
     gtest
@@ -188,9 +200,17 @@ target_include_directories(audio_cockpit_validation PRIVATE
     ${OPENVR_INCLUDE_DIRS}
 )
 
+# Add PortAudio include directories
+get_target_property(PORTAUDIO_INCLUDE_DIRS portaudio_static INTERFACE_INCLUDE_DIRECTORIES)
+if(PORTAUDIO_INCLUDE_DIRS)
+    target_include_directories(audio_cockpit_validation PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
+endif()
+
 target_link_libraries(audio_cockpit_validation PRIVATE
     gtest
     gtest_main
+    gmock
+    gmock_main
     spdlog::spdlog
     jsoncpp_interface
     Threads::Threads

@@ -60,6 +60,7 @@ add_compile_definitions(
     _CRT_SECURE_NO_WARNINGS
     _UNICODE
     UNICODE
+    _USE_MATH_DEFINES  # Define M_PI constant for <cmath>
 )
 
 # Windows Audio APIs
