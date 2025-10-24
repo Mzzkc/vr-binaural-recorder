@@ -7,15 +7,15 @@
 [![Audio](https://img.shields.io/badge/audio-48kHz%20Binaural-orange)](https://en.wikipedia.org/wiki/Binaural_recording)
 [![Status](https://img.shields.io/badge/status-Beta-yellow)](docs/BETA_TESTING_GUIDE.md)
 
-VR Binaural Recorder is a spatial audio creation tool for ASMRtists and content creators. Record with any standard microphone while wearing a VR headset—your natural head movements create immersive 3D binaural audio that listeners experience as true spatial positioning.
+VR Binaural Recorder is a spatial audio monitoring tool for ASMRtists and content creators. Monitor any standard microphone with real-time binaural processing while wearing a VR headset—your natural head movements create immersive 3D spatial audio that listeners experience as true spatial positioning through headphones.
 
 ## Features
 
 - **Real-Time Spatial Audio Processing**: HRTF-based binaural synthesis with <10ms latency
 - **Natural VR Head Tracking**: Move your head naturally—no complex controls needed
 - **Visual Audio Cockpit**: Intuitive VR interface with microphone positioning and audio level meters
-- **Professional Audio Quality**: MIT KEMAR HRTF dataset for authentic spatial positioning
-- **OBS Integration**: Stream spatial ASMR live to Twitch/YouTube
+- **Professional Audio Quality**: High-quality synthetic HRTF with 2.37x spatial differentiation (MIT KEMAR planned for v1.1)
+- **OBS Integration**: Stream spatial ASMR live to Twitch/YouTube via virtual audio device
 - **Universal Microphone Support**: Works with USB, XLR, wireless—any microphone you own
 
 ## Quick Start
@@ -31,12 +31,13 @@ Run `VRBinauralRecorder-Windows-x64-Setup.exe` (requires administrator privilege
 ### 3. Launch
 Start **VR Binaural Recorder** from the desktop shortcut or Start Menu
 
-### 4. Record
+### 4. Monitor Spatial Audio
 - Put on your VR headset
 - Audio Cockpit overlay appears in front of you
-- Move your head naturally to create spatial audio
+- Move your head naturally to create real-time spatial audio
 - Use VR controllers to position the virtual microphone
-- Point and click to start/stop recording
+- Monitor binaural output through your headphones
+- Route output to OBS for streaming (see [OBS Integration Guide](docs/OBS_INTEGRATION_GUIDE.md))
 
 ## System Requirements
 
@@ -80,11 +81,13 @@ This creates authentic binaural spatialization that listeners experience as 3D p
 
 ## Technical Architecture
 
-- **Audio Engine**: PortAudio with ASIO/WASAPI support
-- **HRTF Processing**: MIT KEMAR dataset (368 spatial positions)
+- **Audio Engine**: PortAudio with ASIO/WASAPI support, virtual audio device output
+- **HRTF Processing**: High-quality synthetic spatial audio (2.37x L/R differentiation proven)
 - **VR Integration**: OpenVR SDK v1.23.7 (SteamVR compatible)
 - **UI System**: ImGui with OpenGL VR overlay rendering
 - **Performance**: SIMD optimization, lock-free audio buffers, real-time thread scheduling
+
+**Note**: Beta focuses on real-time monitoring and OBS integration. Direct file recording planned for v1.1. See `docs/BETA_LIMITATIONS.md` for complete scope details.
 
 ## Beta Program
 
@@ -98,10 +101,10 @@ This is a **beta release** for ASMRtist testing and validation. Your feedback he
 ### What to Test
 - Installation and setup process
 - VR headset compatibility
-- Spatial audio quality
-- Recording workflow
+- Spatial audio quality and real-time monitoring
 - OBS streaming integration
 - Performance on your system
+- Virtual audio device functionality
 
 See the [Beta Testing Guide](docs/BETA_TESTING_GUIDE.md) for detailed testing procedures and bug report templates.
 

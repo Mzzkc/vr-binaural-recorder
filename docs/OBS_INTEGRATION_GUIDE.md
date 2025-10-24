@@ -17,21 +17,24 @@
 
 **Start VR Binaural Recorder FIRST** to create the virtual audio device:
 
-```batch
-REM 1. Launch with streaming optimization
-"C:\Program Files\VR Binaural Recorder\VRBinauralRecorder.exe" --streaming-mode
+1. **Launch VR Binaural Recorder**
+   - Use the desktop shortcut or Start Menu
+   - Application automatically creates virtual audio device on startup
+   - Wait for "Virtual Audio Device: Created successfully" message in log
 
-REM 2. Verify virtual audio device creation
-echo Checking Windows audio devices...
-powershell "Get-AudioDevice -List | Where-Object {$_.Name -like '*VR Binaural*'}"
-```
+2. **Verify virtual audio device creation**:
+   ```batch
+   REM Check Windows audio devices
+   powershell "Get-AudioDevice -List | Where-Object {$_.Name -like '*VR Binaural*'}"
+   ```
 
 **Expected Result**: Windows Sound panel shows "VR Binaural Recorder (Virtual)" as available audio device
 
 ### Phase 2: Audio Device Validation (2 minutes)
 
-**CRITICAL**: Verify the virtual device operates at 48kHz (matching HRTF processing)
+**IMPORTANT**: The virtual device operates at 48kHz (matching HRTF processing)
 
+**Verify Sample Rate**:
 ```batch
 REM Check virtual device sample rate
 powershell "Get-AudioDevice | Where-Object {$_.Name -like '*VR Binaural*'} | Format-Table Name, SampleRate"
@@ -39,10 +42,11 @@ powershell "Get-AudioDevice | Where-Object {$_.Name -like '*VR Binaural*'} | For
 REM Should show: SampleRate: 48000
 ```
 
-**If sample rate is NOT 48kHz:**
-1. Close VR Binaural Recorder
-2. Set Windows default audio to 48kHz: `Sound Settings → Device Properties → Additional device properties → Advanced → 48000 Hz, 16 bit`
-3. Restart VR Binaural Recorder with `--force-48khz` flag
+**If virtual device doesn't appear:**
+1. Check application log: `%APPDATA%\VRBinauralRecorder\logs\`
+2. Look for "Virtual Audio Device: Created successfully"
+3. If missing, close and restart VR Binaural Recorder
+4. Ensure no other audio applications are blocking device creation
 
 ---
 

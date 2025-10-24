@@ -2,11 +2,13 @@
 
 **Welcome Beta Testers!**
 
-Thank you for participating in the VR Binaural Recorder beta program. You're helping shape the future of spatial ASMR recording. This guide will walk you through setup, usage, and how to provide valuable feedback.
+Thank you for participating in the VR Binaural Recorder beta program. You're helping shape the future of spatial ASMR content creation. This guide will walk you through setup, usage, and how to provide valuable feedback.
+
+**IMPORTANT - BETA SCOPE:** This beta release focuses on **real-time spatial audio monitoring and OBS streaming integration**. Direct file recording capability is planned for v1.1. See `docs/BETA_LIMITATIONS.md` for complete scope details.
 
 ## What is VR Binaural Recorder?
 
-VR Binaural Recorder transforms any microphone into a spatialized binaural audio source based on your VR headset position. Move your head naturally while wearing your VR headset, and the audio positioning updates in real-time to create immersive 3D audio experiences for your ASMR content.
+VR Binaural Recorder transforms any microphone into a spatialized binaural audio source based on your VR headset position. Move your head naturally while wearing your VR headset, and the audio positioning updates in real-time to create immersive 3D audio that you can monitor through headphones or stream via OBS for live content creation.
 
 **Key Features:**
 - Real-time binaural spatial audio processing
@@ -84,7 +86,8 @@ After installation, run the diagnostic wizard:
    - "VR System: Connected" (if SteamVR/Oculus is running)
    - "Audio Devices: Found [X] input devices"
    - "HRTF Data: Loaded successfully"
-   - "System Ready for Recording"
+   - "Virtual Audio Device: Created successfully"
+   - "System Ready"
 
 ## VR Headset Setup
 
@@ -150,20 +153,20 @@ After installation, run the diagnostic wizard:
 
 **Common Issue**: If OpenVR fails, ensure WMR Portal is running BEFORE launching the app
 
-## First Recording Session
+## First Monitoring Session
 
-### Pre-Recording Checklist
+### Pre-Session Checklist
 
-Before your first recording, validate the complete audio pipeline:
+Before your first session, validate the complete audio pipeline:
 
 1. **Position Your Microphone**:
    - Place microphone 30cm in front of where you'll stand/sit
    - Mouth height (approximately 1.5m from floor)
-   - Pointing toward your recording position
+   - Pointing toward your position
 
 2. **Calibrate VR Space**:
    - Put on VR headset
-   - Stand at your recording position
+   - Stand at your position
    - Launch VR Binaural Recorder
    - The Audio Cockpit overlay will appear in front of you
 
@@ -177,18 +180,18 @@ Before your first recording, validate the complete audio pipeline:
 
 4. **Verify Audio Levels**:
    - Watch the Audio Cockpit meters in VR
-   - Speak at normal recording volume
+   - Speak at normal volume
    - Levels should peak around -12dB to -6dB (green zone)
    - Adjust microphone gain if needed
 
-### Basic Recording Workflow
+### Basic Monitoring Workflow
 
 1. **Put on VR Headset**
 2. **Launch VR Binaural Recorder** (if not already running)
 3. **See Audio Cockpit**:
    - Virtual microphone appears as a blue orb
    - Audio level meters show real-time input
-   - Recording controls visible (Record/Stop buttons)
+   - Binaural output routed to headphones and virtual audio device
 
 4. **Position Virtual Microphone** (optional):
    - Point VR controller at the blue microphone orb
@@ -196,24 +199,20 @@ Before your first recording, validate the complete audio pipeline:
    - Move controller to reposition in 3D space
    - Release trigger to place
 
-5. **Start Recording**:
-   - Point controller at green "RECORD" button
-   - Pull trigger to start
-   - Button turns red and pulses
-   - Controller vibrates to confirm
-   - "REC" indicator appears in corner
-
-6. **Create Your Content**:
+5. **Monitor Spatial Audio**:
    - Move your head naturally
-   - Spatial audio follows head movement
-   - Speak/whisper into microphone as normal
+   - The virtual microphone stays in 3D space
+   - Your head movement creates spatial audio positioning
+   - Listen through headphones to hear binaural effect
    - Watch audio meters to ensure good levels
 
-7. **Stop Recording**:
-   - Point controller at red "STOP" button
-   - Pull trigger to stop
-   - Controller vibrates to confirm
-   - File saves automatically to `Documents/VR Binaural Recordings/`
+6. **Stream to OBS** (optional):
+   - Configure OBS to capture "VR Binaural Recorder (Virtual)" audio device
+   - See `docs/OBS_INTEGRATION_GUIDE.md` for detailed setup
+   - Start streaming with real-time spatial audio
+   - Your head movements create immersive positioning for viewers
+
+**Note**: Direct file recording will be added in v1.1. For now, capture output via OBS or other recording software using the virtual audio device.
 
 ### Understanding Spatial Audio
 
@@ -233,14 +232,12 @@ The Audio Cockpit is your VR control interface:
 ### Display Elements:
 - **Virtual Microphone Orb**: Blue sphere showing mic position in 3D space
 - **Audio Level Meters**: Real-time left/right channel levels
-- **Recording Status**: "REC" indicator when recording active
+- **Monitoring Status**: Shows active audio processing
 - **Controller Indicators**: Shows which controllers are detected
-- **System Status**: VR tracking status, audio engine status
+- **System Status**: VR tracking status, audio engine status, virtual device status
 
 ### Controls:
-- **Record Button**: Green when stopped, red when recording
-- **Stop Button**: Available only during recording
-- **Microphone Positioning**: Grab and drag the blue orb
+- **Microphone Positioning**: Grab and drag the blue orb to reposition in 3D space
 - **Auto-Hide**: UI fades after 3 seconds of inactivity (move controller to show)
 
 ## OBS Integration for Streaming
@@ -319,13 +316,13 @@ Your spatial audio will be captured and streamed to Twitch/YouTube in real-time.
 4. Check configuration file: `vr_binaural_config.json` → `"audio": {"sampleRate": 48000}`
 5. Restart application
 
-### Problem: "Recording Files Are Empty or Silent"
+### Problem: "Virtual Audio Device Not Appearing in OBS"
 
 **Solutions**:
-1. Check microphone levels in Windows Sound Settings
-2. Verify correct microphone selected in application
-3. Check if another application has exclusive control of mic
-4. Test microphone in another application first (Windows Voice Recorder)
+1. Start VR Binaural Recorder BEFORE launching OBS
+2. Check application log: should show "Virtual Audio Device: Created successfully"
+3. In OBS, refresh audio device list (Settings → Audio → restart OBS)
+4. Verify Windows Sound Settings shows "VR Binaural Recorder (Virtual)" device
 5. Review application log file: `%APPDATA%\VRBinauralRecorder\logs\`
 
 ### Problem: "VR Tracking is Jittery or Laggy"
@@ -437,33 +434,35 @@ Tell us what's working great! We want to know:
 
 1. **Start Simple**:
    - First session: 30 seconds of speaking and head movement
-   - Verify spatial audio works correctly
-   - Then progress to longer recordings
+   - Verify spatial audio works correctly through headphones
+   - Then progress to longer monitoring sessions
 
 2. **Test Different Scenarios**:
-   - Standing vs sitting recording positions
+   - Standing vs sitting positions
    - Different microphone positions
    - Various head movement speeds
-   - Different recording environments
+   - Different environments
 
 3. **Document Your Setup**:
    - Take photos of your physical microphone placement
-   - Note your typical recording workflow
+   - Note your typical workflow
    - Track what works well vs what doesn't
 
-4. **Compare with Traditional Recording**:
-   - Record the same content with traditional binaural mic
-   - Compare quality and spatial effect
-   - Provide feedback on differences
+4. **Test OBS Integration**:
+   - Capture virtual audio device in OBS
+   - Stream or record to file via OBS
+   - Compare quality with traditional binaural mic
+   - Provide feedback on spatial effect quality
 
 ### Help Us Improve:
 
 **We Especially Need Feedback On**:
 - Audio quality compared to your traditional setup
 - Ease of use and learning curve
-- VR comfort during recording sessions
+- VR comfort during monitoring sessions
 - Integration with your existing workflow
-- OBS streaming integration
+- OBS streaming/recording integration
+- Virtual audio device reliability
 - Performance on different PC configurations
 - Any features you expected but couldn't find
 
@@ -485,7 +484,11 @@ Tell us what's working great! We want to know:
 
 **A**: Currently, controller interaction is the primary method. A future update may add keyboard/mouse positioning options.
 
-### Q: Can I record multiple microphones simultaneously?
+### Q: How do I record to a file?
+
+**A**: The beta focuses on real-time monitoring and OBS integration. To record to file, use OBS or other recording software to capture the "VR Binaural Recorder (Virtual)" audio device. Direct file recording will be added in v1.1.
+
+### Q: Can I monitor multiple microphones simultaneously?
 
 **A**: The beta supports single microphone input. Multi-mic support is planned for a future release.
 
@@ -501,9 +504,9 @@ Tell us what's working great! We want to know:
 
 **A**: Not in the beta. The HRTF dataset uses standard head dimensions. Custom head models may be added in future versions.
 
-### Q: How much storage do recordings use?
+### Q: How much CPU does spatial audio processing use?
 
-**A**: At 48kHz stereo, approximately 11MB per minute of recording (WAV format).
+**A**: Typically 15-25% on recommended hardware (8+ core CPUs). Performance scales with buffer size settings.
 
 ### Q: Can I use Bluetooth audio?
 
