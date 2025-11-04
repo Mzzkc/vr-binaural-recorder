@@ -187,6 +187,7 @@ void AudioRoutingOverlay::UpdateControllerTracking(const std::vector<VRPose>& co
 }
 
 void AudioRoutingOverlay::UpdateMicrophoneTracking(const VRPose& hmdPose) {
+    (void)hmdPose;  // Intentional stub - optional feature not yet implemented
     // Optional: Auto-position microphone relative to head movement
     // This could be useful for some ASMRtist workflows
 }
