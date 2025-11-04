@@ -1723,7 +1723,21 @@ bool AudioEngine::ApplyPolyphaseInterpolation(const float* input, float* output,
 bool AudioEngine::SetupPlatformOptimizations() {
 #ifdef _WIN32
     // Windows-specific optimizations
-    SetProcessPriorityClass(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+    // Use GetProcAddress for maximum compatibility with different Windows SDK versions
+    HMODULE kernel32 = GetModuleHandleA("kernel32.dll");
+    if (kernel32) {
+        typedef BOOL (WINAPI *SetProcessPriorityClassFunc)(HANDLE, DWORD);
+        SetProcessPriorityClassFunc setPriority =
+            (SetProcessPriorityClassFunc)GetProcAddress(kernel32, "SetProcessPriorityClass");
+        if (setPriority) {
+            #ifndef HIGH_PRIORITY_CLASS
+            #define HIGH_PRIORITY_CLASS 0x00000080
+            #endif
+            setPriority(GetCurrentProcess(), HIGH_PRIORITY_CLASS);
+        } else {
+            LOG_DEBUG("SetProcessPriorityClass not available - using normal priority");
+        }
+    }
     return true;
 #elif defined(__linux__)
     // Linux-specific optimizations
