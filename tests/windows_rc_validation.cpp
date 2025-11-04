@@ -31,8 +31,8 @@
 
 #ifdef _WIN32
 #include "windows_wasapi_virtual_device.h"
-#include "windows_gui.h"
-#include "headset_support.h"
+// #include "windows_gui.h" // TODO: Implement when GUI components are ready
+// #include "headset_support.h" // TODO: Implement when headset support module is ready
 #endif
 
 namespace vrb {

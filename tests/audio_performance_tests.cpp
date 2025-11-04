@@ -15,6 +15,7 @@
 
 #ifdef _WIN32
 #include <windows.h>
+#include <psapi.h>
 #include <mmdeviceapi.h>
 #include <audioclient.h>
 #include <avrt.h>
@@ -186,7 +187,7 @@ TEST_F(AudioPerformanceTest, WASAPIExclusiveModeLatency) {
     WindowsWASAPIVirtualDevice::DeviceConfig device_config;
     device_config.sampleRate = 48000;
     device_config.channels = 2;
-    device_config.bufferSize = 64;
+    device_config.bufferFrames = 64;
     device_config.exclusiveMode = true;
     device_config.lowLatencyMode = true;
 
@@ -217,7 +218,7 @@ TEST_F(AudioPerformanceTest, WASAPISharedModeLatency) {
     WindowsWASAPIVirtualDevice::DeviceConfig device_config;
     device_config.sampleRate = 48000;
     device_config.channels = 2;
-    device_config.bufferSize = 128;
+    device_config.bufferFrames = 128;
     device_config.exclusiveMode = false;
     device_config.lowLatencyMode = false;
 
@@ -341,13 +342,15 @@ TEST_F(AudioPerformanceTest, SpatialAudioUpdatePerformance) {
         test_poses.push_back(pose);
     }
 
-    VRPose mic_pose = {{0.0f, 1.2f, 0.0f}, {0.0f, 0.0f, 0.0f, 1.0f}};
+    VRPose mic_pose;
+    mic_pose.position = Vec3(0.0f, 1.2f, 0.0f);
+    mic_pose.orientation = Quat(0.0f, 0.0f, 0.0f, 1.0f);
 
     // Measure spatial update performance
     auto start_time = std::chrono::high_resolution_clock::now();
 
     for (const auto& pose : test_poses) {
-        hrtf_processor->UpdateSpatialPosition(pose, mic_pose);
+        hrtf_processor->UpdateSpatialPosition(pose, {mic_pose});
     }
 
     auto end_time = std::chrono::high_resolution_clock::now();
@@ -430,11 +433,13 @@ TEST_F(AudioPerformanceTest, CPUUsageUnderLoad) {
         head_pose.position.x = std::sin(i * 0.1f) * 0.5f;
         head_pose.position.y = 1.8f + std::sin(i * 0.05f) * 0.1f;
         head_pose.position.z = std::cos(i * 0.1f) * 0.5f;
-        head_pose.orientation = {0.0f, std::sin(i * 0.02f) * 0.1f, 0.0f, 1.0f};
+        head_pose.orientation = Quat(0.0f, std::sin(i * 0.02f) * 0.1f, 0.0f, 1.0f);
 
-        VRPose mic_pose = {{0.0f, 1.2f, -1.0f}, {0.0f, 0.0f, 0.0f, 1.0f}};
+        VRPose mic_pose;
+        mic_pose.position = Vec3(0.0f, 1.2f, -1.0f);
+        mic_pose.orientation = Quat(0.0f, 0.0f, 0.0f, 1.0f);
 
-        hrtf_processor->UpdateSpatialPosition(head_pose, mic_pose);
+        hrtf_processor->UpdateSpatialPosition(head_pose, {mic_pose});
 
         // Maintain update rate
         auto target_time = start_time + std::chrono::microseconds(
@@ -472,7 +477,7 @@ TEST_F(AudioPerformanceTest, ExtendedStressTest) {
     const int check_interval_seconds = 10;
     const int total_checks = (stress_duration_minutes * 60) / check_interval_seconds;
 
-    std::vector<AudioEngine::Stats> stats_history;
+    std::vector<AudioEngine::AudioStats> stats_history;
 
     for (int check = 0; check < total_checks; check++) {
         std::this_thread::sleep_for(std::chrono::seconds(check_interval_seconds));

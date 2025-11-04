@@ -4,6 +4,7 @@
 #include <gmock/gmock.h>
 #include "../modules/ui/audio_routing_overlay.h"
 #include "../core/include/vr_types.h"
+#include "../core/include/logger.h"
 #include <vector>
 #include <thread>
 #include <chrono>

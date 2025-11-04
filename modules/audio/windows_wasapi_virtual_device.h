@@ -19,6 +19,8 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <functional>
+#include <vector>
 
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "propsys.lib")

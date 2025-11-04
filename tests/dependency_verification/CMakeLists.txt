@@ -78,6 +78,10 @@ if(WIN32)
         ole32
         oleaut32
     )
+    # Set console subsystem (not GUI)
+    set_target_properties(test_jsoncpp PROPERTIES
+        LINK_FLAGS "/SUBSYSTEM:CONSOLE"
+    )
 endif()
 
 # Test 2: PortAudio verification
@@ -99,6 +103,10 @@ if(WIN32)
         ws2_32
         setupapi
     )
+    # Set console subsystem (not GUI)
+    set_target_properties(test_portaudio PROPERTIES
+        LINK_FLAGS "/SUBSYSTEM:CONSOLE"
+    )
 endif()
 
 # Test 3: HRTF verification (standalone - no external deps needed)
@@ -112,6 +120,10 @@ if(WIN32)
     target_link_libraries(test_hrtf PRIVATE
         kernel32
         user32
+    )
+    # Set console subsystem (not GUI)
+    set_target_properties(test_hrtf PROPERTIES
+        LINK_FLAGS "/SUBSYSTEM:CONSOLE"
     )
 endif()
 

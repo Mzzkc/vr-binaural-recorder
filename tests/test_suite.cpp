@@ -449,17 +449,17 @@ TEST_F(ConfigTest, InvalidConfig) {
 
 TEST_F(AudioEngineTest, VirtualDeviceCreation) {
     // Test virtual device creation capabilities
-    AudioEngine engine;
-    Config config;
-    HRTFProcessor hrtf;
+    AudioEngine test_engine;
+    Config test_config;
+    HRTFProcessor test_hrtf;
 
-    EXPECT_TRUE(engine.Initialize(config, &hrtf));
+    EXPECT_TRUE(test_engine.Initialize(test_config, &test_hrtf));
 
     // In mock mode, virtual device creation should be skipped but not fail
     // In real mode, it should attempt PulseAudio device creation
-    if (engine.IsMockBackend()) {
+    if (test_engine.IsMockBackend()) {
         // Mock backend doesn't create real virtual devices, but initialization should succeed
-        EXPECT_TRUE(engine.GetStats().framesProcessed == 0);
+        EXPECT_TRUE(test_engine.GetStats().framesProcessed == 0);
         LOG_INFO("Virtual device test ran in mock mode (expected for WSL/CI environments)");
     } else {
         // Real mode - virtual device should be created

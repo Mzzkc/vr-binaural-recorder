@@ -17,7 +17,7 @@
 #include "vr_tracker.h"
 
 #ifdef _WIN32
-#include "windows_gui.h"
+// #include "windows_gui.h" // TODO: Implement when GUI components are ready
 #include "windows_wasapi_virtual_device.h"
 #endif
 
