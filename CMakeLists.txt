@@ -107,8 +107,10 @@ endif()
 # OpenVR - Real SDK integration for VR head tracking
 # CEO directive: VR tracking IS the product differentiator, not manual positioning
 set(OPENVR_ROOT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/third_party/openvr")
-# Use headers directory directly (include is a symlink that doesn't work on Windows)
-if(EXISTS "${OPENVR_ROOT_DIR}/include")
+# Windows requires headers directory directly (include is a symlink)
+if(WIN32)
+    set(OPENVR_INCLUDE_DIRS "${OPENVR_ROOT_DIR}/headers")
+elseif(EXISTS "${OPENVR_ROOT_DIR}/include")
     set(OPENVR_INCLUDE_DIRS "${OPENVR_ROOT_DIR}/include")
 else()
     set(OPENVR_INCLUDE_DIRS "${OPENVR_ROOT_DIR}/headers")

@@ -206,6 +206,7 @@ target_include_directories(integration_tests PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/vr
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/ui
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/common
+    ${OPENVR_INCLUDE_DIRS}
 )
 
 target_link_libraries(integration_tests PRIVATE

@@ -39,7 +39,7 @@ BEGIN
 END
 
 // Application manifest
-1 RT_MANIFEST "app.manifest"
+1 RT_MANIFEST "../../cmake/windows/app.manifest"
 
 // Menu resources
 IDR_MAIN_MENU MENU

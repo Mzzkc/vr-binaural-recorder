@@ -118,14 +118,7 @@ function(configure_windows_target target_name)
     # Link Windows platform libraries
     target_link_libraries(${target_name} PRIVATE ${WINDOWS_PLATFORM_LIBS})
 
-    # Set application manifest for DPI awareness and Windows compatibility
-    if(MSVC)
-        set_target_properties(${target_name} PROPERTIES
-            VS_USER_PROPS "${CMAKE_CURRENT_SOURCE_DIR}/cmake/windows/app.manifest"
-        )
-    endif()
-
-    # Set application icon
+    # Set application icon and manifest (via .rc file)
     if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/app.rc")
         target_sources(${target_name} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/resources/windows/app.rc")
     endif()

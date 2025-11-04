@@ -345,6 +345,7 @@ public:
 };
 
 int main(int argc, char* argv[]) {
+    (void)argc; (void)argv;  // Unused in standalone test
     std::cout << "=== Windows HRTF Dependency Verification with Fallback System ===" << std::endl;
     std::cout << "Created by Mike Rodriguez for Windows build verification" << std::endl;
     std::cout << "Testing Riley's HRTF fallback system and spatial audio positioning" << std::endl << std::endl;

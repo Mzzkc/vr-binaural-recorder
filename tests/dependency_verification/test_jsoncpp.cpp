@@ -175,6 +175,7 @@ void printConfig(const TestConfig& config) {
 }
 
 int main(int argc, char* argv[]) {
+    (void)argc; (void)argv;  // Unused in standalone test
     std::cout << "=== Windows jsoncpp Dependency Verification ===" << std::endl;
     std::cout << "Created by Mike Rodriguez for Windows build verification" << std::endl;
     std::cout << "Testing Riley's 58-line bulletproof config loading" << std::endl << std::endl;

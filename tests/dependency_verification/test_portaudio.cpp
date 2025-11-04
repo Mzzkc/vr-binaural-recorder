@@ -59,7 +59,7 @@ static int audioCallback(const void* inputBuffer, void* outputBuffer,
                         const PaStreamCallbackTimeInfo* timeInfo,
                         PaStreamCallbackFlags statusFlags,
                         void* userData) {
-
+    (void)inputBuffer; (void)timeInfo; (void)statusFlags; (void)userData;  // Unused parameters
     float* out = static_cast<float*>(outputBuffer);
 
     if (g_toneGenerator) {
@@ -236,6 +236,7 @@ bool testAudioStream(PaDeviceIndex outputDevice, const AudioTestConfig& config) 
 }
 
 int main(int argc, char* argv[]) {
+    (void)argc; (void)argv;  // Unused in standalone test
     std::cout << "=== Windows PortAudio WASAPI Dependency Verification ===" << std::endl;
     std::cout << "Created by Mike Rodriguez for Windows build verification" << std::endl;
     std::cout << "Testing Windows audio device access and WASAPI functionality" << std::endl << std::endl;
