@@ -1767,6 +1767,7 @@ bool AudioEngine::ConfigureASIOSettings() {
 
 #ifdef _WIN32
     try {
+#ifdef PA_USE_ASIO
         // Get ASIO driver info
         PaHostApiIndex asioIndex = -1;
         int numHostApis = Pa_GetHostApiCount();
@@ -1811,9 +1812,15 @@ bool AudioEngine::ConfigureASIOSettings() {
                 LOG_INFO("Buffer size adjusted for ASIO granularity: {} samples", m_bufferSize);
             }
         }
+#else
+        // ASIO not available - use WASAPI on Windows
+        LOG_INFO("ASIO SDK not available, using WASAPI for audio");
+#endif
 
+#ifdef PA_USE_ASIO
         LOG_INFO("ASIO configuration complete - Buffer range: {}-{}, Preferred: {}, Granularity: {}",
                  minBufferSize, maxBufferSize, preferredBufferSize, granularity);
+#endif
 
         return true;
 

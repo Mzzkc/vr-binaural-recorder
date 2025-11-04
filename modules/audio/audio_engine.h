@@ -25,7 +25,9 @@
 // Platform-specific includes for low-latency audio
 #ifdef _WIN32
 #include <pa_win_wasapi.h>
+#ifdef PA_USE_ASIO
 #include <pa_asio.h>
+#endif
 #include <windows.h>
 #include <avrt.h>
 #pragma comment(lib, "avrt.lib")
