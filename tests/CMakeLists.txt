@@ -84,6 +84,13 @@ if(WIN32)
     target_link_libraries(compilation_fixes_validation PRIVATE
         ${WINDOWS_PLATFORM_LIBS}
     )
+    # Remove WIN32_LEAN_AND_MEAN for this target - audio_engine needs full Windows API
+    # Specifically: SetProcessPriorityClass from processthreadsapi.h
+    if(MSVC)
+        target_compile_options(compilation_fixes_validation PRIVATE /UWIN32_LEAN_AND_MEAN)
+    else()
+        target_compile_options(compilation_fixes_validation PRIVATE -UWIN32_LEAN_AND_MEAN)
+    endif()
 endif()
 
 target_compile_definitions(compilation_fixes_validation PRIVATE

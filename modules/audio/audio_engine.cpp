@@ -17,16 +17,7 @@
 
 // Platform-specific includes
 #ifdef _WIN32
-// Temporarily undefine WIN32_LEAN_AND_MEAN to ensure we get process/thread APIs
-#ifdef WIN32_LEAN_AND_MEAN
-#undef WIN32_LEAN_AND_MEAN
-#define RESTORE_WIN32_LEAN_AND_MEAN
-#endif
 #include <windows.h>
-#ifdef RESTORE_WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#undef RESTORE_WIN32_LEAN_AND_MEAN
-#endif
 #include <mmreg.h>
 #include <ks.h>
 #include <ksmedia.h>
