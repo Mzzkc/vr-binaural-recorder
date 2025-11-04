@@ -45,6 +45,13 @@ if(PORTAUDIO_INCLUDE_DIRS)
     target_include_directories(compilation_fixes_validation PRIVATE ${PORTAUDIO_INCLUDE_DIRS})
 endif()
 
+# Explicitly add OpenVR headers (ensure absolute path)
+if(WIN32)
+    target_include_directories(compilation_fixes_validation PRIVATE
+        "${CMAKE_SOURCE_DIR}/third_party/openvr/headers"
+    )
+endif()
+
 target_link_libraries(compilation_fixes_validation PRIVATE
     gtest
     gtest_main
@@ -69,6 +76,13 @@ if(UNIX AND NOT APPLE)
         ${X11_LIBRARIES}
         GL
         GLU
+    )
+endif()
+
+# Add Windows platform libraries
+if(WIN32)
+    target_link_libraries(compilation_fixes_validation PRIVATE
+        ${WINDOWS_PLATFORM_LIBS}
     )
 endif()
 
