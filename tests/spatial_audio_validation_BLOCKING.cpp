@@ -4,7 +4,6 @@
 // MISSION: Create tests that ASMRtists would fail on if spatial audio is broken
 // NO DEPLOYMENT until these pass. NO EXCEPTIONS.
 
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <vector>
 #include <numeric>

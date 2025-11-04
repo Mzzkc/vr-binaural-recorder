@@ -1,6 +1,5 @@
 // hrtf_processor.cpp - Head-Related Transfer Function Processing Implementation
 
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <algorithm>
 #include <cstring>

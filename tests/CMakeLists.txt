@@ -243,6 +243,7 @@ target_include_directories(spatial_audio_validation_BLOCKING PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/audio
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/vr
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/common
+    ${OPENVR_INCLUDE_DIRS}
 )
 
 target_link_libraries(spatial_audio_validation_BLOCKING PRIVATE
@@ -269,6 +270,7 @@ target_include_directories(ceo_spatial_validation PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/audio
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/vr
     ${CMAKE_CURRENT_SOURCE_DIR}/../modules/common
+    ${OPENVR_INCLUDE_DIRS}
 )
 
 target_link_libraries(ceo_spatial_validation PRIVATE

@@ -17,6 +17,7 @@
 
 // Platform-specific includes
 #ifdef _WIN32
+#include <windows.h>
 #include <mmreg.h>
 #include <ks.h>
 #include <ksmedia.h>

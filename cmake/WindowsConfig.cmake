@@ -38,6 +38,9 @@ if(MSVC)
     add_compile_options(/W4 /WX)
     add_compile_options(/wd4251) # Disable DLL interface warning
     add_compile_options(/wd4275) # Disable non-DLL interface base class warning
+    add_compile_options(/wd4324) # Disable structure padding warning (intentional cache-line alignment)
+    add_compile_options(/wd4244) # Disable conversion warnings (intentional in ring buffer)
+    add_compile_options(/wd4189) # Disable unused variable warning (may be used in debug builds)
 
     # Note: WIN32_EXECUTABLE property will be set in configure_windows_target() function
 

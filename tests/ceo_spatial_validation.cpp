@@ -1,7 +1,6 @@
 // ceo_spatial_validation.cpp - Alex Kim (Creative Coder) - CEO Pipeline Validation
 // CRITICAL PROOF: Complete pipeline validation for CEO approval
 
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <iostream>
 #include <vector>
