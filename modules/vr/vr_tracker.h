@@ -46,7 +46,7 @@ public:
     int GetConnectedControllerCount() const;
 
     // Testing framework compatibility methods
-    void EnableSimulationMode(bool enable) { /* Not implemented - hardware-only tracker */ }
+    void EnableSimulationMode(bool enable) { (void)enable; /* Not implemented - hardware-only tracker */ }
     bool IsSimulationMode() const { return false; } // Always hardware mode
     std::vector<std::string> GetTroubleshootingSteps() const;
 

@@ -147,7 +147,8 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 
 # GLEW for OpenGL extensions
 if(WIN32)
-    set(GLEW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/glew")
+    # Use GLEW bundled with OpenVR samples
+    set(GLEW_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/third_party/openvr/samples/thirdparty/glew/glew-1.11.0")
     set(GLEW_INCLUDE_DIRS "${GLEW_ROOT}/include")
     set(GLEW_LIBRARIES "${GLEW_ROOT}/lib/Release/x64/glew32.lib")
 else()

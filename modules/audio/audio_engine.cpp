@@ -18,6 +18,7 @@
 // Platform-specific includes
 #ifdef _WIN32
 #include <windows.h>
+#include <processthreadsapi.h>  // Explicit include for SetProcessPriorityClass
 #include <mmreg.h>
 #include <ks.h>
 #include <ksmedia.h>
