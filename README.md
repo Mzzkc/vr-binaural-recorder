@@ -1,5 +1,7 @@
 # VR Binaural Recorder
 
+**THIS IS NONFUNCTIONAL SLOP PRODUCED AS PART OF TESTING AGENTIC WORKFLOWS. FOR A VERSION OF THIS THAT ACTUALLY WORKS GO SUBSCRIBE: https://patreon.com/OrendCross**
+
 **Transform any microphone into spatialized binaural audio using VR head tracking**
 
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue)](https://www.microsoft.com/windows)
